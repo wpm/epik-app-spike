@@ -77,31 +77,77 @@ also just subprocess drivers for the same CLI. Nothing was reimplemented; the ha
 
 ## Crate evaluation
 
-Candidates from crates.io, sources reviewed in-tree:
+Candidates from crates.io. Sources reviewed in-tree, both finalists compile-tested
+on Rust 1.96 and smoke-tested against CLI 2.1.220 (subagent report; probe artifacts
+in the session scratchpad):
 
-| crate | version | state | control protocol |
+| crate | version | state | verdict |
 |---|---|---|---|
-| `claude-agent-sdk` (Wally869) | 0.1.1 | stale (2025-09-30, pre-2.x CLIs) | yes: `can_use_tool` callback, `--permission-prompt-tool` |
-| `claude-code-sdk-rust` (PandelisZ) | 0.4.1 | active (2026-07-21) | yes: full control module — initialize, can_use_tool, deny-with-interrupt |
-| `claude-code-sdk` | 0.0.3 | abandoned (2025-06) | not evaluated further |
-| `claude-cli-sdk` | 0.5.1 | semi-active (2026-03) | not evaluated further |
+| `claude-agent-sdk` | 0.1.1 | frozen 2025-09-30 | **reject — see warning below** |
+| `claude-code-sdk-rust` (PandelisZ) | 0.4.1 | active (2026-07-21) | correct; viable base, kept as reference |
+| `claude-code-sdk` | 0.0.3 | abandoned 2025-06 | ruled out |
+| `claude-cli-sdk` | 0.5.1 | stale; 4 of 6 versions yanked | ruled out |
 
-**Choice: hand-roll.** Recorded reasoning:
+**⚠ Warning worth repeating to anyone evaluating crates: `claude-agent-sdk` 0.1.1
+falsely presents as official.** Its manifest claims `authors = Anthropic` and a
+`github.com/anthropics/...` repository that 404s; the actual publisher is
+unaffiliated. Worse, its "control protocol" is invented — the string
+`control_request` never appears in the crate; it emits shapes like
+`{"type":"control","method":"interrupt"}` that no CLI has ever spoken. Empirically:
+its interrupt is **silently ignored** (the model kept generating; `interrupt()`
+returns `Ok(())` having done nothing), incoming `can_use_tool` requests are
+discarded (a permission prompt would hang forever), and its parser hard-fails on
+unknown message types. One-shot queries work, which is exactly what makes it a trap.
+
+`claude-code-sdk-rust` 0.4.1, by contrast, checks out everywhere it was probed:
+always-on bidirectional stream-json, full control protocol with exactly-right
+`can_use_tool` shapes (allow/updatedInput, deny/message/interrupt), streaming
+deltas, unknown message types skipped with a regression test, multi-turn on one
+process verified, interrupt acknowledged, 141 tests passing with paid e2e correctly
+gated. Warts are cosmetic (README import path wrong, ~400 lines of dead SSE code, a
+usage field returned as None).
+
+**Choice: hand-roll, with `claude-code-sdk-rust` as the named fallback and
+reference.** Recorded reasoning:
 
 1. The needed surface is small — the spike's whole protocol module plus session task
-   is ~700 lines with tests, written in about an hour against live captures. A
-   dependency must clear a low bar to beat that, and neither crate clears it.
-2. `claude-agent-sdk` predates ten months of CLI evolution; its parity target is the
-   Python SDK of late 2025. Betting Epik's interface on an unmaintained wrapper of a
-   fast-moving protocol is the worst of both worlds.
-3. `claude-code-sdk-rust` is credible and current (it would be the fallback), but it
-   owns the exact joints Epik cares about — permission UX, event shape, session
-   lifecycle — behind its own opinions, while the authoritative contract (`sdk.d.ts`)
-   is Anthropic's, not the crate's. Tracking upstream directly removes a middleman
-   that can lag or reinterpret.
-4. The protocol's failure mode is additive drift, and a vendored parser with
-   unknown-tolerant enums degrades gracefully by construction; a third-party crate's
-   strictness decisions are outside our control.
+   is ~700 lines with tests, written in about an hour against live captures, and
+   verified against the same CLI behaviors the crate is verified against.
+2. The authoritative contract (`sdk.d.ts`) is Anthropic's, not the crate's. Tracking
+   upstream directly removes a single-maintainer, pre-1.0 middleman (628 downloads)
+   that can lag or reinterpret — while it owns the exact joints Epik cares about
+   (permission UX, event shape, session lifecycle). Its buffered
+   `receive_response()` API would also have needed bypassing for responsive UI.
+3. The protocol's failure mode is additive drift; both our parser and the crate
+   handle it the same way (skip unknown message types — ours by `untagged` fallback
+   variants, with tests). This property, not any single feature, is what survives
+   CLI upgrades.
+4. Value still extracted from the crate: its `tests/wire_parity.rs` (347 lines
+   pinning real CLI payload shapes) is a ready-made conformance corpus worth porting
+   into the app's test suite at V-next.
+
+## The success demo, as it actually ran
+
+In the app (`demo/run-epik.sh`: sonnet-5, persona loaded, EpikMCP attached,
+read-only tools pre-allowed, mutating tools gated by the permission banner):
+
+1. Epik greeted ("Hello, I'm Epik"), and — unprompted — read the spike's LOG.md and
+   correctly analyzed the spike's own state. Persona and design-partner behavior
+   intact inside the Rust surface.
+2. Asked for the demo, it inspected `wpm/small-project` via EpikMCP (each mutating
+   or unlisted tool raising a y/n ask in the app: `gh_raw` ×3, `issue_create`,
+   `feature_launch` ×2), created issue #9, dispatched `feature_launch`, and set up
+   its own periodic polling to monitor the run.
+3. First build run succeeded as a run but could not open PRs: the repo forbade
+   GitHub Actions from creating pull requests. The build narrated the exact blocker
+   and fix onto issue #9 — Epik's failure-reporting design working as intended. The
+   setting was fixed (`PUT …/actions/permissions/workflow`), Epik relaunched from
+   chat, and run 2 completed: code implemented and tested on `feature/9-multiply`,
+   review PR #10 opened against `main` with `Closes #9`, main untouched.
+4. Epik confirmed completion from inside the app and volunteered a real product
+   observation: `feature_status` returns an empty view for a standalone issue
+   (no sub-issues), so the aggregation view needs either sub-issue conventions or a
+   fallback. Kept here as V-next input.
 
 ## What broke and why (all resolved)
 
@@ -109,6 +155,8 @@ Candidates from crates.io, sources reviewed in-tree:
   from the keyring token) — pushed via git-over-SSH instead. Not app-related.
 - No `can_use_tool` requests appeared at first: Bill's global `"Bash"` allow rule
   auto-approved everything. Diagnosis above under gotchas; forced with ask rules.
+- The demo repo forbade Actions-created PRs (see above) — a repo-settings item for
+  Epik's `init` checklist, not an app defect.
 - Nothing in the protocol or process layer itself broke during the spike.
 
 ## Distribution story vs MCPB

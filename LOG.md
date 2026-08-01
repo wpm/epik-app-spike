@@ -155,3 +155,29 @@ always be sufficient for a fresh session to resume the spike.
   status line). Session total est. ≤ $40. Time: ~3.7h elapsed of 48h limit.
 - Next: on rerun completion — verify review PR, capture Epik's final report,
   finalize FINDINGS/LOG, push.
+
+## 2026-08-01 04:15 CDT — GOAL COMPLETE
+
+- Rerun 30685743921: **success**. Review PR #10 open (`feature/9-multiply` →
+  `main`, `Closes #9`), main untouched, multiply() implemented with tests on the
+  feature branch. Epik confirmed completion from inside the app on its own
+  scheduled poll and flagged that `feature_status` is empty for standalone issues
+  (V-next input, recorded in FINDINGS). Final frame of the demo saved to
+  docs/m3-demo-transcript.txt; Epik session closed cleanly ($2.81 total on its
+  status line).
+- M3 done end-to-end → per the loop's stop conditions, goal complete (M4 also
+  done). All tasks closed. FINDINGS.md finalized GREEN; ADR draft ready for
+  Bill's design-history if adopted.
+- Crate-eval subagent report arrived after a nudge and was folded into FINDINGS.
+  Headline: `claude-agent-sdk` 0.1.1 falsely claims Anthropic authorship (404
+  anthropics/ repo URL, unaffiliated publisher) and its control protocol is
+  fabricated — interrupt silently ignored by the real CLI, can_use_tool requests
+  discarded. `claude-code-sdk-rust` 0.4.1 verified correct end-to-end (141 tests,
+  full control protocol, forward-compatible parsing, multi-turn + interrupt
+  smoke-tested). Hand-roll decision stands, now with empirical backing; the
+  crate's wire_parity.rs noted as a conformance corpus to port at V-next.
+- **Final spend estimate**: CLI-side (probes + haiku runs + sonnet demo + the two
+  Opus builds billed to the same key via Actions) ≈ $10-15; session overhead
+  brings the total comfortably under $50 of the $200 cap. Elapsed: ~4.3h of the
+  48h limit.
+- Everything pushed to origin (main + all milestone branches).
