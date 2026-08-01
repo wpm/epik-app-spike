@@ -6,12 +6,15 @@
 //! the window renders the doctor report *instead of* chat, not chat with an error
 //! banner over it.
 
-use epik_core::EngineReport;
+use epik_core::{EngineReport, Profile};
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 
+use crate::components::chat::ChatPane;
+use crate::components::session_panel::SessionPanel;
 use crate::doctor_screen::{DoctorScreen, NoHostScreen};
 use crate::ipc;
+use crate::session::SessionClient;
 
 /// What the window is showing.
 #[derive(Debug, Clone, PartialEq)]
@@ -71,48 +74,21 @@ fn SplashScreen() -> impl IntoView {
     }
 }
 
-/// The two-panel window: chat on the left, a right panel that holds session
-/// metadata in 0.2.0. The panes themselves arrive with #8, #9 and #10; this is
-/// the frame they mount into, and it is here so the doctor/chat decision above
-/// has something real to choose between.
+/// The two-panel window: chat on the left, session metadata on the right.
+///
+/// The session starts on its own. An app whose first action is always "click to
+/// begin" is asking a question with one answer; the engine is already resolved by
+/// the time this mounts, so there is nothing left to decide.
 #[component]
 fn Shell(report: EngineReport) -> impl IntoView {
-    let version = report
-        .version_raw
-        .clone()
-        .unwrap_or_else(|| "unknown".to_owned());
-    let engine_path = report
-        .path
-        .as_ref()
-        .map(|p| p.display().to_string())
-        .unwrap_or_default();
+    let client = SessionClient::new();
+    client.start(Profile::default());
 
     view! {
         <div class="h-full flex flex-col bg-root">
             <div class="flex-1 flex min-h-0">
-                <section class="flex-1 flex flex-col min-w-0 border-r border-line">
-                    <div class="flex-1 flex items-center justify-center">
-                        <p class="text-sm text-fg-muted">"Chat pane arrives with #8."</p>
-                    </div>
-                </section>
-                <aside class="w-72 shrink-0 flex flex-col bg-surface">
-                    <h2 class="px-4 py-3 text-xs uppercase tracking-wide text-fg-muted
-                               border-b border-line">
-                        "Session"
-                    </h2>
-                    <dl class="p-4 space-y-3 text-xs">
-                        <div>
-                            <dt class="text-fg-muted mb-0.5">"Engine"</dt>
-                            <dd class="font-mono text-fg-secondary break-all selectable">
-                                {engine_path}
-                            </dd>
-                        </div>
-                        <div>
-                            <dt class="text-fg-muted mb-0.5">"CLI version"</dt>
-                            <dd class="font-mono text-fg-secondary selectable">{version}</dd>
-                        </div>
-                    </dl>
-                </aside>
+                <ChatPane client=client />
+                <SessionPanel client=client report=report />
             </div>
         </div>
     }
