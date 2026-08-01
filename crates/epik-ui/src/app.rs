@@ -12,6 +12,7 @@ use leptos::task::spawn_local;
 
 use crate::components::chat::ChatPane;
 use crate::components::session_panel::SessionPanel;
+use crate::components::status_bar::StatusBar;
 use crate::doctor_screen::{DoctorScreen, NoHostScreen};
 use crate::ipc;
 use crate::session::SessionClient;
@@ -90,6 +91,9 @@ fn Shell(report: EngineReport) -> impl IntoView {
                 <ChatPane client=client />
                 <SessionPanel client=client report=report />
             </div>
+            // Full width beneath both panels: the session's state belongs to the
+            // window, not to one half of it.
+            <StatusBar client=client />
         </div>
     }
 }

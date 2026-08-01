@@ -3,4 +3,5 @@
 pub mod chat;
 pub mod permission_card;
 pub mod session_panel;
+pub mod status_bar;
 pub mod tool_card;

@@ -103,3 +103,31 @@ keystrokes go nowhere.
 
 The automated tests do not use this file — they carry their own stubs inline in
 `crates/epik-app/tests/ipc_stream.rs`.
+
+## Status bar: cost accumulation and engine death
+
+Both of #10's properties are checked against `demo/fake-engine.py`, whose two turns
+report `total_cost_usd` of `0.0184` and `0.0231`.
+
+**Cost across two turns.** Send a turn, allow the ask, send another, allow both
+asks. The status bar must read `2 turns` and `$0.0415` — the sum, not the last
+turn's figure. Screenshot: `0.2.0-status-cost-two-turns.png`.
+
+**Engine killed out of band.** With a session live, kill the engine from another
+shell and watch the status bar:
+
+```sh
+pkill -9 -f 'fake-bin/clau[d]e'
+```
+
+The bracket in the pattern stops `pkill -f` from matching its own command line and
+killing the shell that ran it. Expect `closed` and `killed (no exit code)` — a
+SIGKILL leaves no exit status, so there is no number to show and the bar says so
+rather than printing a misleading `exit 0`. Screenshot:
+`0.2.0-status-engine-killed.png`.
+
+**Engine exiting with a code.** For the numeric case, run against an engine that
+exits nonzero: the bar shows `exit 3`, and the session panel's engine-output
+disclosure opens itself, because a session that closed badly is the one case where
+stderr is the first thing worth reading. Screenshot:
+`0.2.0-status-closed-exit-code.png`.
