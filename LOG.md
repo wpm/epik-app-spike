@@ -40,3 +40,44 @@ always be sufficient for a fresh session to resume the spike.
   estimate ≤ $5 total. Well under cap.
 - Next: M1 — bidirectional stream-json + control protocol. Start by probing
   `--input-format stream-json` and `can_use_tool` control requests in the shell.
+
+## 2026-08-01 00:55 CDT — M1 wire protocol proven, session layer built
+
+- Branch `m1-session`, commit `5e1cde4`.
+- **Protocol reference found**: the official TS SDK's `sdk.d.ts` (npm
+  `@anthropic-ai/claude-agent-sdk@0.3.220`, unpacked in scratchpad `package/`) is a
+  ~300KB richly documented type spec of the whole stream-json + control surface.
+  The protocol is *documented*, just not as prose. Kills half of K2's premise.
+- **Spawn recipe** (verbatim from sdk.mjs): `claude -p --output-format stream-json
+  --verbose --input-format stream-json` + `--permission-prompt-tool stdio` when the
+  client wants permission asks (the flag is hidden from --help but present in the
+  binary and functional).
+- **Live probes (python, scratchpad m1-control-probe.py / m1-probe2.py), all against
+  CLI 2.1.220:**
+  - `initialize` control request → success response with commands/models/account.
+  - `can_use_tool` control_request arrives on ask-gated tools; answered with
+    `{"behavior":"allow","updatedInput":...}` → tool runs; `{"behavior":"deny",
+    "message":...}` → tool_result is_error=true with our message, model continues.
+  - Gotcha: asks only fire when the permission system would prompt. Bill's global
+    settings allow all Bash, so probes force `--settings '{"permissions":{"ask":
+    ["Bash"]}}'` + `--permission-mode default`. The real app must think about
+    settings isolation vs inheritance.
+  - `interrupt` control request mid-stream → success ack (`still_queued:[]`),
+    truncated turn, result subtype `error_during_execution`, is_error=true.
+  - Multi-turn: same process, same session_id; each turn re-emits `system/init` and
+    ends with a `result`. CLI exits cleanly on stdin EOF.
+  - Streaming: `--include-partial-messages` emits `stream_event` lines wrapping raw
+    API events; text deltas = `content_block_delta`/`text_delta`.
+- **Rust session layer** (`src/session.rs`): `Session::spawn(SessionConfig)` →
+  events channel + cloneable `SessionHandle` (send_user / respond_permission /
+  interrupt / shutdown). Restructured to lib+bin; `examples/m1_demo.rs` scripts
+  allow→deny→interrupt live: all three behaved exactly as the probes predicted
+  (interrupt stopped a 1-to-300 count at 32). 11 protocol unit tests. clippy/fmt
+  clean.
+- **K1 verdict: does not fire.** Control protocol was reliable within ~1 hour of
+  focused work, not a day.
+- Crate evaluation (claude-agent-sdk v0.1.1, claude-code-sdk-rust v0.4.1) delegated
+  to a subagent; report pending. Decision pending its report, but the hand-rolled
+  layer is ~450 lines total and matches the SDK recipe exactly.
+- **Budget**: CLI probe spend this session ≈ $0.45 cumulative. Est. total incl.
+  session ≤ $15. Next: M2 ratatui chat on top of SessionEvent.
