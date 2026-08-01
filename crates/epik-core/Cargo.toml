@@ -1,0 +1,15 @@
+[package]
+name = "epik-core"
+description = "UI-free session layer driving the Claude Code CLI over stream-json."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# Deliberately no terminal or UI crates here: this crate is the session layer
+# every host embeds, and a host that is not a terminal must not inherit one.
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true

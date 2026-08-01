@@ -7,8 +7,8 @@
 //!
 //! Run: cargo run --example m1_demo
 
-use epik_app::protocol::PermissionDecision;
-use epik_app::session::{Session, SessionConfig, SessionEvent, SessionPermissionMode};
+use epik_core::protocol::PermissionDecision;
+use epik_core::session::{Session, SessionConfig, SessionEvent, SessionPermissionMode};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
