@@ -189,12 +189,20 @@ pub fn control_request(request_id: &str, request: Value) -> Value {
 }
 
 /// Answer to a `can_use_tool` ask.
-#[derive(Debug, Clone, Serialize)]
+///
+/// `Deserialize` as well as `Serialize`: the decision originates in the UI, so it
+/// crosses the host's IPC boundary inbound before being serialized outbound to
+/// the CLI. The shape on both wires is the same one, which is the point.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "behavior", rename_all = "camelCase")]
 pub enum PermissionDecision {
     #[serde(rename = "allow")]
     Allow {
-        #[serde(rename = "updatedInput", skip_serializing_if = "Option::is_none")]
+        #[serde(
+            rename = "updatedInput",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
         updated_input: Option<Value>,
     },
     #[serde(rename = "deny")]

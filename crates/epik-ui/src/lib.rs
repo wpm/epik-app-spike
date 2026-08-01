@@ -9,5 +9,7 @@
 pub mod app;
 pub mod doctor_screen;
 pub mod ipc;
+pub mod session;
+pub mod transcript;
 
 pub use app::App;
