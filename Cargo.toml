@@ -1,13 +1,18 @@
-[package]
-name = "epik-app"
+[workspace]
+resolver = "3"
+members = ["crates/epik-core"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+repository = "https://github.com/wpm/epik-app-spike"
 
-[dependencies]
+# Shared so the crates that arrive later in 0.2.0 — the Tauri host and the
+# Leptos frontend — cannot drift from the core on a version that crosses the
+# IPC boundary. `serde` in particular has to be one version everywhere.
+[workspace.dependencies]
 anyhow = "1.0.104"
-crossterm = { version = "0.29.0", features = ["event-stream"] }
-futures = "0.3.33"
-ratatui = "0.30.2"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 tokio = { version = "1.53.1", features = ["full"] }

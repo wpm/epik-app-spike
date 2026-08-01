@@ -7,7 +7,7 @@ use anyhow::{Context, bail};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
-use epik_app::protocol::{ContentBlock, StreamMessage};
+use epik_core::protocol::{ContentBlock, StreamMessage};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
