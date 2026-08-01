@@ -139,6 +139,32 @@ jobs:
             echo "no frontend crate yet — skipping"
           fi
 
+      - name: Frontend tests
+        run: |
+          if [ -f crates/epik-ui/Cargo.toml ]; then
+            # On the host target: the transcript reducer is pure and its tests
+            # need no browser, so they run as ordinary unit tests.
+            cargo test --manifest-path crates/epik-ui/Cargo.toml
+          else
+            echo "no frontend crate yet — skipping"
+          fi
+
+      # The frontend must not redeclare a type epik-core already defines. One
+      # definition of an event is the whole point of sharing the crate across the
+      # IPC boundary; a mirrored struct would compile happily and then drift.
+      - name: Frontend defines no mirrored core types
+        run: |
+          if [ ! -d crates/epik-ui/src ]; then
+            echo "no frontend crate yet — skipping"
+            exit 0
+          fi
+          shared='SessionEvent|SessionConfig|CanUseToolRequest|PermissionDecision|PermissionRule|PermissionPolicy|PermissionAction|ToolMatcher|EngineReport|EngineStatus|EngineSearch|Profile|StreamMessage|ContentBlock|ResultMessage|SystemMessage|ControlRequest'
+          if grep -rnE "^[[:space:]]*(pub )?(struct|enum) ($shared)\b" crates/epik-ui/src; then
+            echo "::error::the frontend redeclares a type epik-core already defines"
+            exit 1
+          fi
+          echo "no mirrored core types in the frontend"
+
       - name: cargo fmt --check
         run: cargo fmt --all --check
 

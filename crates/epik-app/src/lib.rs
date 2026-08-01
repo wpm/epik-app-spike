@@ -6,6 +6,7 @@
 //! guarantees no engine outlives the window that started it.
 
 pub mod commands;
+pub mod pump;
 pub mod state;
 
 use std::sync::Arc;
@@ -22,6 +23,15 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::engine_report,
             commands::doctor,
+            commands::start_session,
+            commands::send_user,
+            commands::respond_permission,
+            commands::add_session_allow_rule,
+            commands::interrupt,
+            commands::end_session,
+            commands::session_running,
+            commands::session_policy,
+            commands::session_stderr,
         ])
         .build(tauri::generate_context!())
         .expect("failed to build the Epik application");

@@ -13,9 +13,11 @@
 //! `epik-core`'s own types. That is what makes a type mismatch a compile error
 //! here instead of a silently-missing field at runtime.
 
+use epik_core::SessionEvent;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use wasm_bindgen::JsValue;
+use wasm_bindgen::closure::Closure;
+use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 #[wasm_bindgen]
@@ -81,6 +83,94 @@ pub async fn call<T: DeserializeOwned>(cmd: &str) -> Result<T, IpcError> {
     call_with(cmd, &serde_json::Map::new()).await
 }
 
+/// A `tauri::ipc::Channel`, from the frontend's side.
+///
+/// The host writes `SessionEvent`s onto it and they arrive here as JSON, which is
+/// then deserialized into `epik_core::SessionEvent` — the same type, by the same
+/// derived impl, that the host serialized. A channel rather than a global event:
+/// events belong to one session, and `emit` would broadcast them to every
+/// listener with no way to tell whose session they came from.
+pub struct EventChannel {
+    js: JsValue,
+    /// The closure the host calls. Dropping it would detach the handler, so the
+    /// channel owns it for as long as it lives.
+    _on_message: Closure<dyn FnMut(JsValue)>,
+}
+
+impl EventChannel {
+    /// Build a channel whose messages are handed to `on_event`, already decoded.
+    ///
+    /// Undecodable messages go to `on_error` rather than being dropped: a message
+    /// this crate cannot parse means the host and the frontend disagree about a
+    /// type, which is a bug worth surfacing rather than a glitch to swallow.
+    pub fn new(
+        mut on_event: impl FnMut(SessionEvent) + 'static,
+        mut on_error: impl FnMut(String) + 'static,
+    ) -> Result<Self, IpcError> {
+        let js = construct_channel()?;
+        let on_message = Closure::wrap(Box::new(move |message: JsValue| {
+            match from_js::<SessionEvent>(message) {
+                Ok(event) => on_event(event),
+                Err(err) => on_error(err.to_string()),
+            }
+        }) as Box<dyn FnMut(JsValue)>);
+        js_sys::Reflect::set(
+            &js,
+            &JsValue::from_str("onmessage"),
+            on_message.as_ref().unchecked_ref(),
+        )
+        .map_err(|_| IpcError::Decode("could not attach the channel handler".to_owned()))?;
+        Ok(Self {
+            js,
+            _on_message: on_message,
+        })
+    }
+}
+
+/// `new window.__TAURI__.core.Channel()`, via reflection.
+///
+/// Reached through `Reflect` rather than a `#[wasm_bindgen]` constructor binding
+/// because the class only exists once the Tauri script has run; a static binding
+/// would be a link error in a plain browser instead of the `NoHost` this returns.
+fn construct_channel() -> Result<JsValue, IpcError> {
+    let get = |target: &JsValue, key: &str| {
+        js_sys::Reflect::get(target, &JsValue::from_str(key)).map_err(|_| IpcError::NoHost)
+    };
+    let core = get(&get(&js_sys::global(), "__TAURI__")?, "core")?;
+    let ctor: js_sys::Function = get(&core, "Channel")?
+        .dyn_into()
+        .map_err(|_| IpcError::NoHost)?;
+    js_sys::Reflect::construct(&ctor, &js_sys::Array::new())
+        .map_err(|_| IpcError::Decode("could not construct an IPC channel".to_owned()))
+}
+
+/// Call a command, passing an event channel alongside the usual arguments.
+///
+/// The channel has to be the live JS object, so the argument object is assembled
+/// rather than produced wholesale from JSON: `args` contributes its fields, then
+/// the channel is set on top under the name the command's parameter uses.
+pub async fn call_with_channel<T: DeserializeOwned>(
+    cmd: &str,
+    args: &impl Serialize,
+    channel: &EventChannel,
+) -> Result<T, IpcError> {
+    if !host_available() {
+        return Err(IpcError::NoHost);
+    }
+    let object = js_sys::Object::new();
+    let from_args: js_sys::Object = to_js(args)?
+        .dyn_into()
+        .map_err(|_| IpcError::Decode("arguments did not encode to an object".to_owned()))?;
+    js_sys::Object::assign(&object, &from_args);
+    js_sys::Reflect::set(&object, &JsValue::from_str("channel"), &channel.js)
+        .map_err(|_| IpcError::Decode("could not attach the channel".to_owned()))?;
+
+    match invoke(cmd, object.into()).await {
+        Ok(value) => from_js(value),
+        Err(err) => Err(command_error(err)),
+    }
+}
+
 /// Call a command with arguments. `args` serializes to the object Tauri expects,
 /// so its field names must match the command's parameter names.
 pub async fn call_with<T: DeserializeOwned>(
@@ -92,11 +182,16 @@ pub async fn call_with<T: DeserializeOwned>(
     }
     match invoke(cmd, to_js(args)?).await {
         Ok(value) => from_js(value),
-        // Command errors arrive as the `Err` string the command returned.
-        Err(err) => Err(IpcError::Command(
-            err.as_string()
-                .or_else(|| js_sys::JSON::stringify(&err).ok().map(String::from))
-                .unwrap_or_else(|| "command failed".to_owned()),
-        )),
+        Err(err) => Err(command_error(err)),
     }
+}
+
+/// A rejected `invoke` carries the `Err` value the command returned — a string,
+/// for every command in this app.
+fn command_error(err: JsValue) -> IpcError {
+    IpcError::Command(
+        err.as_string()
+            .or_else(|| js_sys::JSON::stringify(&err).ok().map(String::from))
+            .unwrap_or_else(|| "command failed".to_owned()),
+    )
 }

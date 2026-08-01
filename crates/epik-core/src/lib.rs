@@ -26,6 +26,7 @@
 pub mod doctor;
 pub mod event;
 pub mod permission;
+pub mod profile;
 pub mod protocol;
 #[cfg(feature = "host")]
 pub mod session;
@@ -38,6 +39,7 @@ pub use doctor::{EngineReport, EngineSearch, EngineStatus, MIN_SUPPORTED, parse_
 pub use doctor::{inspect, inspect_with, run_doctor};
 pub use event::{SessionConfig, SessionEvent};
 pub use permission::{PermissionAction, PermissionPolicy, PermissionRule, ToolMatcher};
+pub use profile::Profile;
 pub use protocol::{
     ApiMessage, AssistantEnvelope, CanUseToolRequest, ContentBlock, ControlRequest,
     ControlRequestEnvelope, ControlResponseEnvelope, ControlResponsePayload, PermissionDecision,
