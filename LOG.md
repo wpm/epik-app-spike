@@ -81,3 +81,16 @@ always be sufficient for a fresh session to resume the spike.
   layer is ~450 lines total and matches the SDK recipe exactly.
 - **Budget**: CLI probe spend this session ≈ $0.45 cumulative. Est. total incl.
   session ≤ $15. Next: M2 ratatui chat on top of SessionEvent.
+
+## 2026-08-01 01:25 CDT — M2 complete
+
+- Branch `m2-chat`, commit `2606529`. ratatui 0.29 + crossterm event-stream +
+  futures. `src/tui.rs` (~350 lines): transcript with tail-follow, streaming
+  deltas shown italic then replaced by the final block, tool entries ⚙/✓/✗,
+  permission banner answered y/n, Esc interrupt, cost accumulator. `src/main.rs`
+  is now the TUI binary; M0 one-shot lives on as `examples/m0_handshake.rs`.
+- Verified live in tmux (100x30): plain chat turn; forced-ask run
+  (`--permission-mode default --settings '{"permissions":{"ask":["Bash"]}}'`)
+  showed the yellow ask banner, `y` allowed it, tool ran, ✓ and output rendered.
+- M0→M2 took ~1.5h wall clock total. Crate-eval subagent still out; M1 decision
+  paragraph in FINDINGS waits for it. Next: M3 — Epik persona + EpikMCP.
