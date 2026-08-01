@@ -46,7 +46,8 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(session: Session) -> Self {
+    /// `busy` starts true when a greeting turn was already sent at launch.
+    pub fn new(session: Session, busy: bool) -> Self {
         Self {
             session,
             transcript: vec![Entry::Info(
@@ -58,7 +59,7 @@ impl App {
             session_id: String::new(),
             model: String::new(),
             cost_total: 0.0,
-            busy: false,
+            busy,
             quit: false,
         }
     }

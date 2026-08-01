@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "EpikMCP": {
+      "command": "uv",
+      "args": ["run", "--project", "/Users/mcneill/Projects/Epik/Epik/mcp", "epik-mcp"]
+    }
+  }
+}

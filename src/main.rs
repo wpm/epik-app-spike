@@ -2,6 +2,7 @@
 //!
 //! Usage: epik-app [--model MODEL] [--settings JSON] [--mcp-config PATH]
 //!                 [--append-system-prompt TEXT] [--permission-mode MODE]
+//!                 [--persona-file PATH] [--greet TEXT]
 
 use std::io::stdout;
 
@@ -14,8 +15,9 @@ use ratatui::backend::CrosstermBackend;
 use epik_app::session::{Session, SessionConfig};
 use epik_app::tui::App;
 
-fn parse_args() -> anyhow::Result<SessionConfig> {
+fn parse_args() -> anyhow::Result<(SessionConfig, Option<String>)> {
     let mut config = SessionConfig::default();
+    let mut greet = None;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         let mut value = |name: &str| {
@@ -30,22 +32,38 @@ fn parse_args() -> anyhow::Result<SessionConfig> {
                 config.append_system_prompt = Some(value("--append-system-prompt")?);
             }
             "--permission-mode" => config.permission_mode = Some(value("--permission-mode")?),
+            "--persona-file" => {
+                let path = value("--persona-file")?;
+                let persona = std::fs::read_to_string(&path)
+                    .map_err(|e| anyhow::anyhow!("cannot read persona file {path}: {e}"))?;
+                config.append_system_prompt = Some(match config.append_system_prompt.take() {
+                    Some(existing) => format!("{existing}\n\n{persona}"),
+                    None => persona,
+                });
+            }
+            "--greet" => greet = Some(value("--greet")?),
             other => bail!("unknown argument: {other}"),
         }
     }
-    Ok(config)
+    Ok((config, greet))
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let config = parse_args()?;
+    let (config, greet) = parse_args()?;
     let session = Session::spawn(config).await?;
+    let greeted = if let Some(text) = greet {
+        session.handle().send_user(&text).await?;
+        true
+    } else {
+        false
+    };
 
     terminal::enable_raw_mode()?;
     execute!(stdout(), EnterAlternateScreen)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
 
-    let result = App::new(session).run(&mut terminal).await;
+    let result = App::new(session, greeted).run(&mut terminal).await;
 
     terminal::disable_raw_mode()?;
     execute!(stdout(), LeaveAlternateScreen)?;
