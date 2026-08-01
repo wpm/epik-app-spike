@@ -1,0 +1,300 @@
+# Epik headless feature build.
+#
+# Dispatched by the EpikMCP `feature_launch` tool (which runs
+# `gh workflow run epik-build.yml`) or manually from the Actions tab. Runs a
+# headless Claude Code session that implements the feature issue's sub-issues
+# on a feature branch and reports back through GitHub (PRs, issue comments,
+# this run's status).
+#
+# A build's endpoint is a pull request from the feature branch into the base
+# branch, linked to the feature issue: the single human review that gates
+# merging the feature. The prompt below ends the build by opening it, so the
+# endpoint is part of the workflow rather than something a builder has to
+# think of on its own.
+#
+# Requirements:
+#   - The `ANTHROPIC_API_KEY` repository secret must be configured.
+#   - Optionally, an `EPIK_BUILD_GH_TOKEN` secret (a PAT with repo scope) can
+#     be configured so that PRs opened by the build trigger CI; the default
+#     `github.token` cannot trigger downstream workflows.
+#
+# Failure reporting: every reporting mechanism a headless build has is
+# model-narrated, so the one event the model cannot narrate is its own death.
+# The preflight step below asks the Anthropic API whether this build can run at
+# all and, when the answer is no, writes the explanation onto the feature issue
+# itself. Every run also leaves the session's raw execution output attached as
+# an artifact, which is where a dead build's last turns survive.
+# There is deliberately no retry logic anywhere in this workflow:
+# a failed build is documented, and restarting it is a human decision made by
+# relaunching `feature_launch` from chat.
+
+name: Epik Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      feature_issue_number:
+        description: "Feature issue number to build"
+        required: true
+        type: string
+      base_branch:
+        description: "Branch the feature branch is created from (default: repository default branch)"
+        required: false
+        default: ""
+        type: string
+      target_branch:
+        description: "Feature branch the build works on (default: feature-<issue number>)"
+        required: false
+        default: ""
+        type: string
+
+# The model the build runs on, in one place: the preflight call below checks
+# this exact model, and any model pin added to `claude_args` must reference the
+# same variable so the two can never drift apart.
+env:
+  EPIK_BUILD_MODEL: claude-opus-5
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: read
+  id-token: write
+
+concurrency:
+  group: epik-build-${{ inputs.feature_issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: "Epik build: feature #${{ inputs.feature_issue_number }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      BASE_BRANCH: ${{ inputs.base_branch || github.event.repository.default_branch }}
+      TARGET_BRANCH: ${{ inputs.target_branch || format('feature-{0}', inputs.feature_issue_number) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.EPIK_BUILD_GH_TOKEN || github.token }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "epik-build"
+          git config user.email "epik-build@users.noreply.github.com"
+
+      # A build whose API key is rejected dies before it can say anything: no
+      # turns, no comment, no error text anywhere in the run log. Ask the API
+      # directly instead, and write the answer where the build's failure would
+      # otherwise be invisible — the feature issue.
+      - name: Preflight Anthropic API
+        id: preflight
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.EPIK_BUILD_GH_TOKEN || github.token }}
+          FEATURE_ISSUE: ${{ inputs.feature_issue_number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          status=$(curl -sS -o /tmp/preflight.json -w '%{http_code}' \
+            https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "$(jq -nc --arg model "$EPIK_BUILD_MODEL" \
+                  '{model: $model, max_tokens: 1, messages: [{role: "user", content: "ping"}]}')") \
+            || status="000"
+
+          if [ "$status" = "200" ]; then
+            echo "Anthropic API preflight OK ($EPIK_BUILD_MODEL)."
+            exit 0
+          fi
+
+          msg=$(jq -r '.error.message // empty' /tmp/preflight.json 2>/dev/null || true)
+          [ -n "$msg" ] || msg="no error message returned by the API"
+          echo "::error::Anthropic API preflight failed ($status) for model $EPIK_BUILD_MODEL: $msg"
+
+          {
+            if [ "$status" = "000" ]; then
+              echo "I can't start this build: I could not reach the Anthropic" \
+                   "API at all — the request failed before any HTTP response." \
+                   "A human needs to check the run log, and relaunch me once" \
+                   "the API is reachable again."
+            else
+              echo "I can't start this build. The Anthropic API rejected my" \
+                   "key ($status): $msg — a human needs to fix the" \
+                   "\`ANTHROPIC_API_KEY\` secret or the account it bills to," \
+                   "then relaunch me."
+            fi
+            echo
+            if printf '%s' "$msg" | grep -qi 'credit balance'; then
+              echo "Note: Claude subscription credits and API credits are" \
+                   "separate. Check **console.anthropic.com → Plans &" \
+                   "Billing** for the organization this key belongs to" \
+                   "(Settings → API Keys shows the key's workspace/org) — a" \
+                   "balance shown on claude.ai or in a different org does not" \
+                   "fund this key."
+              echo
+            fi
+            echo "- Feature issue: #$FEATURE_ISSUE"
+            echo "- Feature branch: \`$TARGET_BRANCH\`"
+            echo "- Model checked: \`$EPIK_BUILD_MODEL\`"
+            echo "- Failed run: $RUN_URL"
+          } > /tmp/preflight-comment.md
+
+          gh issue comment "$FEATURE_ISSUE" -R "$GITHUB_REPOSITORY" \
+            --body-file /tmp/preflight-comment.md
+          exit 1
+
+      - name: Run headless feature build
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.EPIK_BUILD_GH_TOKEN || github.token }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.EPIK_BUILD_GH_TOKEN || github.token }}
+          claude_args: |
+            --allowedTools "Bash,Read,Write,Edit,MultiEdit,Glob,Grep,WebFetch,TodoWrite,Task"
+            --max-turns 400
+          prompt: |
+            You are running a headless Epik feature build in GitHub Actions.
+
+            Repository: ${{ github.repository }}
+            Feature issue: #${{ inputs.feature_issue_number }}
+            Base branch: ${{ env.BASE_BRANCH }}
+            Feature branch: ${{ env.TARGET_BRANCH }}
+
+            Implement the feature issue and all of the issues it indicates.
+            The feature issue may specify a set of issues, either as child
+            issues or linked issues described in the text. Do all work on the
+            feature branch. Never touch the default branch.
+
+            1. Read feature issue #${{ inputs.feature_issue_number }} with the
+               gh CLI and identify its sub-issues and their dependency order.
+            2. If the feature branch does not already exist on GitHub, create
+               it from the HEAD of the base branch and push it.
+            3. Implement the issues in dependency order. Each issue gets its
+               own branch named `<issue#>-<slug>` cut from the feature branch,
+               and a pull request targeting the feature branch.
+            4. Watch each pull request's CI with `gh pr checks` and fix
+               failures. When a pull request is green, merge it into the
+               feature branch and close its issue.
+            5. As you go, post progress comments on the feature issue so
+               status is visible from chat: one when the build starts, one as
+               each sub-issue's PR opens and merges, and a final summary that
+               links the review pull request from step 6.
+            6. Finish by opening the review pull request: from the feature
+               branch `${{ env.TARGET_BRANCH }}` into the base branch
+               `${{ env.BASE_BRANCH }}`, titled for feature issue
+               #${{ inputs.feature_issue_number }} and with
+               `Closes #${{ inputs.feature_issue_number }}` in its body. This
+               one pull request is the human review that gates merging the
+               feature, so describe what the feature does and what changed in
+               it. If it already exists, leave it open and link that one
+               rather than opening a second.
+
+            The build is complete when all sub-issues are implemented and
+            merged into the feature branch, the feature branch is pushed, and
+            the review pull request from step 6 is open against
+            `${{ env.BASE_BRANCH }}`. Never merge that pull request yourself,
+            and never merge the feature branch into the base branch by any
+            other means — the review is a human's to do.
+            If you become blocked (an unresolvable CI failure, a merge
+            conflict you cannot resolve, missing permissions), post a comment
+            on the feature issue explaining exactly what a human needs to do,
+            then stop.
+
+      # The raw turn-by-turn record of the session, kept as-is: no schema, no
+      # parsing, just the file. It is the only place a dead build's last turns
+      # survive. `if-no-files-found: ignore` covers the preflight-failure path,
+      # where the Claude step never ran and the file was never created.
+      - name: Upload Claude execution output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-execution-output
+          path: ${{ runner.temp }}/claude-execution-output.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # The build narrates its own progress, but it cannot narrate its own
+      # death — a session that dies mid-turn leaves the feature issue's thread
+      # hanging at "Build started." So when the job fails for any reason, the
+      # workflow says so itself, with the links a human needs to see what
+      # happened. The preflight step already names its own cause, so stay quiet
+      # when it was the step that failed: one comment per failure.
+      - name: Report build failure on the feature issue
+        if: failure() && steps.preflight.outcome != 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.EPIK_BUILD_GH_TOKEN || github.token }}
+          FEATURE_ISSUE: ${{ inputs.feature_issue_number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          jobs_api="repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs"
+
+          # Step-level anchors point a human straight at the log that matters.
+          # A job that failed without a failed step (timeout, cancellation,
+          # runner loss) still gets a line, or the list would come out empty.
+          gh api "$jobs_api" --paginate --jq '
+            .jobs[] | . as $j
+            | ($j.steps // [] | map(select(.conclusion == "failure"))) as $failed
+            | if ($failed | length) > 0
+              then $failed[] | "- `\($j.name)` → step **\(.name)**: \($j.html_url)#step:\(.number):1"
+              elif $j.conclusion == "failure"
+              then "- `\($j.name)`: \($j.html_url) (job failed with no failed step recorded)"
+              else empty end
+          ' > /tmp/failed-jobs.md 2>/dev/null || true
+
+          # Failing checks on the pull requests the build opened, if it got
+          # that far. Merged PRs were green by definition; only open ones can
+          # still be red.
+          : > /tmp/failed-checks.md
+          for pr in $(gh pr list -R "$GITHUB_REPOSITORY" --base "$TARGET_BRANCH" \
+                        --state open --json number --jq '.[].number' 2>/dev/null || true); do
+            fails=$(gh pr checks "$pr" -R "$GITHUB_REPOSITORY" --json name,bucket,link \
+                      --jq '.[] | select(.bucket == "fail") | "  - \(.name): \(.link)"' \
+                      2>/dev/null || true)
+            if [ -n "$fails" ]; then
+              printf -- '- PR #%s\n%s\n' "$pr" "$fails" >> /tmp/failed-checks.md
+            fi
+          done
+
+          {
+            echo "This build failed, and it died without being able to say so" \
+                 "itself — so this comment comes from the workflow, not from me."
+            echo
+            echo "- Feature issue: #$FEATURE_ISSUE"
+            echo "- Feature branch: \`$TARGET_BRANCH\`"
+            echo "- Base branch: \`$BASE_BRANCH\`"
+            echo "- Failed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "- Failed run: $RUN_URL"
+            echo
+            echo "**Where it failed in this run**"
+            echo
+            if [ -s /tmp/failed-jobs.md ]; then
+              cat /tmp/failed-jobs.md
+            else
+              echo "- No failed job or step was recorded yet; see the run itself:" \
+                   "$RUN_URL"
+            fi
+            if [ -s /tmp/failed-checks.md ]; then
+              echo
+              echo "**Failing checks on open pull requests into \`$TARGET_BRANCH\`**"
+              echo
+              cat /tmp/failed-checks.md
+            fi
+            if [ -f "$RUNNER_TEMP/claude-execution-output.json" ]; then
+              echo
+              echo "The session's raw execution output is attached to the run" \
+                   "as the \`claude-execution-output\` artifact — that is where" \
+                   "its last turns survive."
+            fi
+            echo
+            echo "Nothing was retried. Relaunch me from chat once the cause is" \
+                 "fixed; whatever work already merged into \`$TARGET_BRANCH\`" \
+                 "stays there."
+          } > /tmp/failure-comment.md
+
+          cat /tmp/failure-comment.md
+          gh issue comment "$FEATURE_ISSUE" -R "$GITHUB_REPOSITORY" \
+            --body-file /tmp/failure-comment.md
