@@ -206,6 +206,6 @@ read-only tools pre-allowed, mutating tools gated by the permission banner):
 
 - Wall clock: kickoff 2026-07-31 23:54 CDT → all milestones by ~03:00 CDT (one
   session, well inside the two-day limit).
-- Spend: CLI probes + demos ≈ $2 (haiku for mechanics, sonnet for the Epik demo);
+- Spend: CLI probes + demos ≈ \$2 (haiku for mechanics, sonnet for the Epik demo);
   the `feature_launch` build ran on the target repo's own Actions + API key as
-  designed. Session total estimated well under $50 against the $200 cap.
+  designed. Session total estimated well under \$50 against the \$200 cap.
