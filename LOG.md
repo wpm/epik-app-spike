@@ -5,8 +5,8 @@ always be sufficient for a fresh session to resume the spike.
 
 ## 2026-07-31 23:54 CDT — Kickoff
 
-- **Time limit**: two days from now → hard stop 2026-08-02 ~23:54 CDT.
-- **Budget**: hard stop at $200 estimated spend. Current estimate: ~$0.
+- **Time limit**: two days from now → hard stop 2026-08-02 23:54 CDT.
+- **Budget**: hard stop at \$200 estimated spend. Current estimate: \$0.
 - Environment verified:
   - `claude` CLI 2.1.220 at `/opt/homebrew/bin/claude`
   - Rust 1.96.0 stable, cargo, clippy 0.1.96, rustfmt 1.9.0
@@ -32,12 +32,12 @@ always be sufficient for a fresh session to resume the spike.
     session and reports session_id, model, tools, CLI version, apiKeySource.
   - User-level config bleeds in: hooks fire (`system/hook_started`), plugins load,
     global CLAUDE.md creates a ~24.5k-token cache write → one cold Fable turn cost
-    $0.271. Test runs will pin `--model claude-haiku-4-5` (~$0.03/turn). The real app
+    \$0.271. Test runs will pin `--model claude-haiku-4-5` (~\$0.03/turn). The real app
     will likely want config isolation flags evaluated later.
   - Final `result` message carries `total_cost_usd`, `num_turns`, usage — the app
     gets budget telemetry for free.
-- **Budget**: CLI spend so far ≈ $0.30. Session spend not precisely known; rough
-  estimate ≤ $5 total. Well under cap.
+- **Budget**: CLI spend so far ≈ \$0.30. Session spend not precisely known; rough
+  estimate ≤ \$5 total. Well under cap.
 - Next: M1 — bidirectional stream-json + control protocol. Start by probing
   `--input-format stream-json` and `can_use_tool` control requests in the shell.
 
@@ -79,7 +79,7 @@ always be sufficient for a fresh session to resume the spike.
 - Crate evaluation (claude-agent-sdk v0.1.1, claude-code-sdk-rust v0.4.1) delegated
   to a subagent; report pending. Decision pending its report, but the hand-rolled
   layer is ~450 lines total and matches the SDK recipe exactly.
-- **Budget**: CLI probe spend this session ≈ $0.45 cumulative. Est. total incl.
+- **Budget**: CLI probe spend this session ≈ \$0.45 cumulative. Est. total incl.
   session ≤ $15. Next: M2 ratatui chat on top of SessionEvent.
 
 ## 2026-08-01 01:25 CDT — M2 complete
@@ -124,7 +124,7 @@ always be sufficient for a fresh session to resume the spike.
   - Epik created issue #9 (multiply(a,b) in ops.py) and dispatched
     feature_launch → run 30685585463, then scheduled its own 2-min polling.
 - Run monitor armed on this side too (gh run view loop). Cost of the demo
-  session so far: $0.76 (visible in the app's own status line).
+  session so far: \$0.76 (visible in the app's own status line).
 - Next while build runs: M4 distribution work + FINDINGS skeleton.
 
 ## 2026-08-01 03:35 CDT — Checkpoint: M4 done, deliverables drafted, build rerun in flight
@@ -151,8 +151,8 @@ always be sufficient for a fresh session to resume the spike.
   can_approve_pull_request_reviews). Epik relaunched from inside the app →
   run 30685743921, in progress, monitored both by Epik (its own scheduled
   polling) and by a local monitor.
-- **Budget**: probes+demos ≈ $2.8 CLI-side (Epik session at $2.04 on its own
-  status line). Session total est. ≤ $40. Time: ~3.7h elapsed of 48h limit.
+- **Budget**: probes+demos ≈ \$2.8 CLI-side (Epik session at \$2.04 on its own
+  status line). Session total est. ≤ \$40. Time: ~3.7h elapsed of 48h limit.
 - Next: on rerun completion — verify review PR, capture Epik's final report,
   finalize FINDINGS/LOG, push.
 
@@ -163,7 +163,7 @@ always be sufficient for a fresh session to resume the spike.
   feature branch. Epik confirmed completion from inside the app on its own
   scheduled poll and flagged that `feature_status` is empty for standalone issues
   (V-next input, recorded in FINDINGS). Final frame of the demo saved to
-  docs/m3-demo-transcript.txt; Epik session closed cleanly ($2.81 total on its
+  docs/m3-demo-transcript.txt; Epik session closed cleanly (\$2.81 total on its
   status line).
 - M3 done end-to-end → per the loop's stop conditions, goal complete (M4 also
   done). All tasks closed. FINDINGS.md finalized GREEN; ADR draft ready for
@@ -177,7 +177,7 @@ always be sufficient for a fresh session to resume the spike.
   smoke-tested). Hand-roll decision stands, now with empirical backing; the
   crate's wire_parity.rs noted as a conformance corpus to port at V-next.
 - **Final spend estimate**: CLI-side (probes + haiku runs + sonnet demo + the two
-  Opus builds billed to the same key via Actions) ≈ $10-15; session overhead
-  brings the total comfortably under $50 of the $200 cap. Elapsed: ~4.3h of the
+  Opus builds billed to the same key via Actions) ≈ \$10-15; session overhead
+  brings the total comfortably under \$50 of the \$200 cap. Elapsed: ~4.3h of the
   48h limit.
 - Everything pushed to origin (main + all milestone branches).
