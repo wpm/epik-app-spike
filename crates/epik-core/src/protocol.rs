@@ -126,7 +126,11 @@ pub enum ControlRequest {
 /// Permission ask for one tool call. The CLI sends more advisory fields than
 /// listed here (suggestions, rule matches); we keep what a UI needs to render
 /// a prompt and answer it.
-#[derive(Debug, Clone, Deserialize)]
+///
+/// `Serialize` as well as `Deserialize`, because this is the one wire type that
+/// rides inside a [`crate::SessionEvent`] and therefore has to cross the host's
+/// IPC boundary intact.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CanUseToolRequest {
     pub tool_name: String,
     #[serde(default)]

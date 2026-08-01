@@ -24,6 +24,7 @@
 //! can reach past the re-exports without this crate having to anticipate it.
 
 pub mod doctor;
+pub mod permission;
 pub mod protocol;
 pub mod session;
 
@@ -31,9 +32,10 @@ pub mod session;
 // worth keeping stable, in one place, so `use epik_core::...` is the whole
 // import story for an ordinary embedder.
 pub use doctor::{EngineReport, MIN_SUPPORTED, inspect, parse_version, run_doctor};
+pub use permission::{PermissionAction, PermissionPolicy, PermissionRule, ToolMatcher};
 pub use protocol::{
     ApiMessage, AssistantEnvelope, CanUseToolRequest, ContentBlock, ControlRequest,
     ControlRequestEnvelope, ControlResponseEnvelope, ControlResponsePayload, PermissionDecision,
     ResultMessage, StreamEvent, StreamMessage, SystemMessage, UserEnvelope,
 };
-pub use session::{Session, SessionConfig, SessionEvent, SessionHandle, SessionPermissionMode};
+pub use session::{STDERR_BUFFER_LINES, Session, SessionConfig, SessionEvent, SessionHandle};
