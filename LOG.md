@@ -94,3 +94,35 @@ always be sufficient for a fresh session to resume the spike.
   showed the yellow ask banner, `y` allowed it, tool ran, ✓ and output rendered.
 - M0→M2 took ~1.5h wall clock total. Crate-eval subagent still out; M1 decision
   paragraph in FINDINGS waits for it. Next: M3 — Epik persona + EpikMCP.
+
+## 2026-08-01 02:20 CDT — M3 demo in flight
+
+- Scouted the Epik repo (read-only, via subagent). Key facts: EpikMCP is a Python
+  MCP server run by `uv run --project <Epik>/mcp epik-mcp`, zero env vars (auth
+  delegated to ambient `gh`); persona is self-contained at
+  `plugin/skills/summon/persona.md`; tools of interest: `issue_create`,
+  `feature_launch(repo, feature_issue_number, base_branch, target_branch)`,
+  `run_list/run_get/run_logs`. ADR convention: `docs/design-history/YYYY-MM-DD-
+  topic.md`, H1 + Status/Date/Source bullets. NOTE for FINDINGS: ADR-0001
+  decision 8 says "GitHub is the dashboard — no custom dashboard", and
+  2026-07-28-presence-not-a-connector constrains "no chat UI, no owned infra";
+  this app is the first non-GitHub Epik surface, so a GREEN verdict needs an ADR
+  that squarely supersedes those.
+- Demo target: `wpm/small-project` ("Test Epik", Bill's Feb sandbox) — the goal
+  forbids touching epik-agent/Epik. Prepped it per Epik's own init flow:
+  copied `.github/workflows/epik-build.yml` from the public epik-agent/Epik
+  (pushed via SSH; keyring gh token lacks `workflow` scope — API PUT 404s, git
+  push works) and set the `ANTHROPIC_API_KEY` secret from env.
+- App: added `--persona-file` and `--greet` (branch `m3-epik`, commit `5deb56a`).
+- Demo (running in tmux session `m3`): launched via demo/run-epik.sh (sonnet-5,
+  persona loaded, EpikMCP attached, read-only tools pre-allowed). Observed:
+  - Persona works: "Hello, I'm Epik" greeting; unprompted, it read LOG.md (cwd
+    is the spike repo) and correctly analyzed the spike's own state — the app
+    hosting Epik analyzing the app is a nice recursion.
+  - Permission banner exercised repeatedly on MCP tools (gh_raw ×3,
+    issue_create, feature_launch), each answered y from the keyboard.
+  - Epik created issue #9 (multiply(a,b) in ops.py) and dispatched
+    feature_launch → run 30685585463, then scheduled its own 2-min polling.
+- Run monitor armed on this side too (gh run view loop). Cost of the demo
+  session so far: $0.76 (visible in the app's own status line).
+- Next while build runs: M4 distribution work + FINDINGS skeleton.
