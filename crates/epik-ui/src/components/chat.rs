@@ -5,6 +5,7 @@ use leptos::html;
 use leptos::prelude::*;
 use leptos::wasm_bindgen::JsCast;
 
+use crate::components::permission_card::PermissionCardView;
 use crate::components::tool_card::ToolCardView;
 use crate::markdown;
 use crate::session::SessionClient;
@@ -55,7 +56,7 @@ fn Transcript(client: SessionClient) -> impl IntoView {
                     // when a long session shows it is needed, not before.
                     entries
                         .into_iter()
-                        .map(|entry| view! { <EntryView entry=entry /> })
+                        .map(|entry| view! { <EntryView entry=entry client=client /> })
                         .collect_view()
                         .into_any()
                 }}
@@ -65,7 +66,7 @@ fn Transcript(client: SessionClient) -> impl IntoView {
 }
 
 #[component]
-fn EntryView(entry: Entry) -> impl IntoView {
+fn EntryView(entry: Entry, client: SessionClient) -> impl IntoView {
     match entry {
         Entry::User(text) => view! {
             <div class="flex justify-end my-3">
@@ -92,17 +93,9 @@ fn EntryView(entry: Entry) -> impl IntoView {
 
         Entry::Tool(card) => view! { <ToolCardView card=card /> }.into_any(),
 
-        // Rendered read-only here so a blocking ask is never invisible; the
-        // answerable card, with allow / deny / always-allow, arrives with #9.
-        Entry::Permission(card) => view! {
-            <div class="my-3 rounded-md border border-warning/40 bg-warning-muted px-3 py-2">
-                <p class="text-xs text-warning">
-                    "Permission required: "
-                    <span class="font-mono">{card.request.tool_name.clone()}</span>
-                </p>
-            </div>
+        Entry::Permission(card) => {
+            view! { <PermissionCardView card=card client=client /> }.into_any()
         }
-        .into_any(),
 
         Entry::Notice { text, level } => {
             let tone = match level {
