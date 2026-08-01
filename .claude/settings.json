@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "epik": {
+      "source": {
+        "source": "github",
+        "repo": "epik-agent/Epik"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "epik@epik": true
+  }
+}
