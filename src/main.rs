@@ -3,6 +3,7 @@
 //! Usage: epik-app [--model MODEL] [--settings JSON] [--mcp-config PATH]
 //!                 [--append-system-prompt TEXT] [--permission-mode MODE]
 //!                 [--persona-file PATH] [--greet TEXT]
+//!        epik-app doctor    # locate + version-check the claude engine
 
 use std::io::stdout;
 
@@ -50,7 +51,18 @@ fn parse_args() -> anyhow::Result<(SessionConfig, Option<String>)> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let (config, greet) = parse_args()?;
+    if std::env::args().nth(1).as_deref() == Some("doctor") {
+        return epik_app::doctor::run_doctor();
+    }
+
+    let (mut config, greet) = parse_args()?;
+    // Resolve the engine up front so a missing/old CLI fails with the doctor
+    // message instead of a bare spawn error.
+    let engine = epik_app::doctor::inspect();
+    match engine.path {
+        Some(path) if engine.supported => config.claude_bin = path.display().to_string(),
+        _ => return epik_app::doctor::run_doctor(),
+    }
     let session = Session::spawn(config).await?;
     let greeted = if let Some(text) = greet {
         session.handle().send_user(&text).await?;
