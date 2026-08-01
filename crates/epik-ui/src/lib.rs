@@ -7,7 +7,9 @@
 //! `SessionEvent` here to fall out of step with the host's.
 
 pub mod app;
+pub mod components;
 pub mod doctor_screen;
+pub mod markdown;
 pub mod ipc;
 pub mod session;
 pub mod transcript;

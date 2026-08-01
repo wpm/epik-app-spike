@@ -79,3 +79,27 @@ Scrubbing the environment (`HOME=/tmp/empty PATH=/usr/bin:/bin`) produces the
 doctor screen instead. The three `WEBKIT_DISABLE_*` variables are container
 workarounds — WebKit's sandbox and DMA-BUF renderer need kernel features a
 container does not have — and are not needed on a normal desktop.
+
+## Looking at the interface: the scripted fake engine
+
+`demo/fake-engine.py` is a stand-in for the `claude` CLI that speaks enough
+stream-json to drive every part of the window: streamed markdown, a tool call that
+succeeds, one that fails, a permission ask answered by hand, and a second ask for
+the same tool so "always allow" has something to suppress. It answers `--version`
+with a supported version, so the doctor accepts it.
+
+```sh
+mkdir -p /tmp/fake-bin
+cp demo/fake-engine.py /tmp/fake-bin/claude && chmod +x /tmp/fake-bin/claude
+PATH=/tmp/fake-bin:$PATH cargo run -p epik-app
+```
+
+The same conversation every time, no API tokens spent, and the awkward states —
+a failing tool, two asks in a row — arrive on cue. The screenshots in
+`docs/screenshots/` were taken this way, under Xvfb, driving the window with
+`xdotool`. Note that with no window manager running, X focus follows the pointer:
+click into the composer with `xdotool mousemove X Y click 1` before typing, or the
+keystrokes go nowhere.
+
+The automated tests do not use this file — they carry their own stubs inline in
+`crates/epik-app/tests/ipc_stream.rs`.
