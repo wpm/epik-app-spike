@@ -6,10 +6,19 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+default = ["host"]
+# Everything that drives a real engine: `Session`, `SessionHandle`, and engine
+# resolution. Off for the wasm frontend, which wants only the types that cross
+# IPC (`event`, `permission`, `protocol`, and the doctor's report types). tokio's
+# process and net features cannot build for wasm32 at all, so this split is what
+# lets one crate serve both sides of the boundary.
+host = ["dep:anyhow", "dep:tokio"]
+
 # Deliberately no terminal or UI crates here: this crate is the session layer
 # every host embeds, and a host that is not a terminal must not inherit one.
 [dependencies]
-anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tokio.workspace = true
+anyhow = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }

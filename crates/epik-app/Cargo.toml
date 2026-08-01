@@ -1,0 +1,28 @@
+[package]
+name = "epik-app"
+description = "Tauri desktop application: a native interface to Epik over the session core."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# A library plus a thin binary rather than one binary: the app's setup has to be
+# reachable from integration tests, and `main` cannot be.
+[lib]
+name = "epik_app"
+crate-type = ["lib"]
+
+[[bin]]
+name = "epik-app"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+epik-core = { path = "../epik-core" }
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tauri = { version = "2", features = [] }

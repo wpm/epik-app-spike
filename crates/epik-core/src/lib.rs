@@ -24,18 +24,24 @@
 //! can reach past the re-exports without this crate having to anticipate it.
 
 pub mod doctor;
+pub mod event;
 pub mod permission;
 pub mod protocol;
+#[cfg(feature = "host")]
 pub mod session;
 
 // The API a host is expected to need, flattened to the crate root: the surface
 // worth keeping stable, in one place, so `use epik_core::...` is the whole
 // import story for an ordinary embedder.
-pub use doctor::{EngineReport, MIN_SUPPORTED, inspect, parse_version, run_doctor};
+pub use doctor::{EngineReport, EngineSearch, EngineStatus, MIN_SUPPORTED, parse_version};
+#[cfg(feature = "host")]
+pub use doctor::{inspect, inspect_with, run_doctor};
+pub use event::{SessionConfig, SessionEvent};
 pub use permission::{PermissionAction, PermissionPolicy, PermissionRule, ToolMatcher};
 pub use protocol::{
     ApiMessage, AssistantEnvelope, CanUseToolRequest, ContentBlock, ControlRequest,
     ControlRequestEnvelope, ControlResponseEnvelope, ControlResponsePayload, PermissionDecision,
     ResultMessage, StreamEvent, StreamMessage, SystemMessage, UserEnvelope,
 };
-pub use session::{STDERR_BUFFER_LINES, Session, SessionConfig, SessionEvent, SessionHandle};
+#[cfg(feature = "host")]
+pub use session::{SHUTDOWN_GRACE, STDERR_BUFFER_LINES, Session, SessionHandle};
