@@ -126,3 +126,32 @@ always be sufficient for a fresh session to resume the spike.
 - Run monitor armed on this side too (gh run view loop). Cost of the demo
   session so far: $0.76 (visible in the app's own status line).
 - Next while build runs: M4 distribution work + FINDINGS skeleton.
+
+## 2026-08-01 03:35 CDT — Checkpoint: M4 done, deliverables drafted, build rerun in flight
+
+- M4 complete (branch `m4-distribution`, merged): `src/doctor.rs` locates the CLI
+  (PATH + known locations), version-checks with a 2.1 floor, actionable errors;
+  app resolves engine at startup; `epik-app doctor` subcommand. Release binary
+  1.9MB. Engine self-fetch verified feasible: official installer = thin shell over
+  `downloads.claude.ai/claude-code-releases/{stable|latest|<ver>/manifest.json|
+  <ver>/<platform>/claude}` with per-platform sha256 — uv pattern applies directly.
+- Deliverables drafted and committed on main: FINDINGS.md (verdict GREEN),
+  docs/2026-08-01-rust-app-spike.md (ADR draft), README.md.
+- Crate verdict recorded from my own source review (both crates downloaded in
+  scratchpad): both implement the control protocol; claude-agent-sdk 0.1.1 is 10
+  months stale; claude-code-sdk-rust 0.4.1 is current and credible but owns the
+  joints Epik cares about. **Hand-roll chosen; claude-code-sdk-rust is the named
+  fallback.** [decision made on own authority] Crate-eval subagent report still
+  outstanding; will fold in if it arrives, decision does not depend on it.
+- M3 build run 1 (30685585463): success as a run, but could not open PRs — repo
+  setting "GitHub Actions is not permitted to create or approve pull requests".
+  The build narrated this precisely onto issue #9 (failure-reporting design
+  working as intended). Fixed via
+  `PUT repos/wpm/small-project/actions/permissions/workflow` (write +
+  can_approve_pull_request_reviews). Epik relaunched from inside the app →
+  run 30685743921, in progress, monitored both by Epik (its own scheduled
+  polling) and by a local monitor.
+- **Budget**: probes+demos ≈ $2.8 CLI-side (Epik session at $2.04 on its own
+  status line). Session total est. ≤ $40. Time: ~3.7h elapsed of 48h limit.
+- Next: on rerun completion — verify review PR, capture Epik's final report,
+  finalize FINDINGS/LOG, push.
