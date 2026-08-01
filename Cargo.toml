@@ -1,6 +1,13 @@
 [workspace]
 resolver = "3"
-members = ["crates/epik-core"]
+members = ["crates/epik-core", "crates/epik-app"]
+
+# The Leptos frontend is a wasm crate. It is deliberately not a workspace member:
+# `cargo build --workspace` would try to build it for the host target, which is
+# not a target it is written for and not a build anyone wants. It is checked on
+# its own target instead — `trunk build` plus a wasm-target clippy run, both in
+# CI — which is stricter than being swept up by a host-target workspace command.
+exclude = ["crates/epik-ui"]
 
 [workspace.package]
 version = "0.1.0"

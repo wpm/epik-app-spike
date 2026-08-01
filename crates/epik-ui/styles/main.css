@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+    /* A desktop window is a window, not a document: the chat pane owns its own
+       scrolling, and the page itself must never scroll or rubber-band. */
+    overflow: hidden;
+    background: var(--epik-bg-root);
+    color: var(--epik-text-primary);
+    font-family: var(--epik-font-sans);
+  }
+
+  /* The window is chrome, not content — selecting it by dragging is always an
+     accident. Anything a user might want to copy opts back in with `.selectable`. */
+  body {
+    user-select: none;
+  }
+
+  .selectable {
+    user-select: text;
+  }
+}

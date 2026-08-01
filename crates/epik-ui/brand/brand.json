@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "Epik",
+  "tagline": "You say it. We make it.",
+  "copyright": "Epik",
+  "fonts": {
+    "sans": {
+      "family": "Geist",
+      "weights": [300, 400, 500, 600, 700],
+      "source": "https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap"
+    },
+    "mono": {
+      "family": "Geist Mono",
+      "weights": [400, 500],
+      "source": "https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&display=swap"
+    }
+  },
+  "palette": {
+    "dark": {
+      "bg": {
+        "root": "#0a0a0a",
+        "surface": "#111111",
+        "raised": "#1a1a1a",
+        "input": "#141414",
+        "bar": "#0e0e0e",
+        "hover": "#1f1f1f",
+        "active": "#262626",
+        "overlay": "rgba(0, 0, 0, 0.60)"
+      },
+      "text": {
+        "primary": "#ededed",
+        "secondary": "#a0a0a0",
+        "muted": "#666666",
+        "faint": "#404040",
+        "inverse": "#0a0a0a"
+      },
+      "accent": {
+        "base": "#00e599",
+        "hover": "#33edb3",
+        "muted": "rgba(0, 229, 153, 0.12)",
+        "onAccent": "#0a0a0a"
+      },
+      "semantic": {
+        "success": "#00e599",
+        "successMuted": "rgba(0, 229, 153, 0.12)",
+        "warning": "#f5a623",
+        "warningMuted": "rgba(245, 166, 35, 0.12)",
+        "error": "#ef4444",
+        "errorMuted": "rgba(239, 68, 68, 0.12)",
+        "info": "#a0a0a0"
+      },
+      "border": {
+        "default": "#1f1f1f",
+        "strong": "#333333"
+      },
+      "graph": {
+        "closed": "#34d399",
+        "open": "#f5a623",
+        "active": "#00e599",
+        "link": "rgba(255, 255, 255, 0.10)"
+      }
+    },
+    "light": {
+      "bg": {
+        "root": "#fafafa",
+        "surface": "#f0f0f0",
+        "raised": "#e5e5e5",
+        "input": "#ffffff",
+        "bar": "#f0f0f0",
+        "hover": "#e0e0e0",
+        "active": "#d4d4d4",
+        "overlay": "rgba(0, 0, 0, 0.15)"
+      },
+      "text": {
+        "primary": "#0a0a0a",
+        "secondary": "#525252",
+        "muted": "#737373",
+        "faint": "#a3a3a3",
+        "inverse": "#ededed"
+      },
+      "accent": {
+        "base": "#00b377",
+        "hover": "#009966",
+        "muted": "rgba(0, 179, 119, 0.10)",
+        "onAccent": "#ffffff"
+      },
+      "semantic": {
+        "success": "#00b377",
+        "successMuted": "rgba(0, 179, 119, 0.10)",
+        "warning": "#d4940a",
+        "warningMuted": "rgba(212, 148, 10, 0.10)",
+        "error": "#dc2626",
+        "errorMuted": "rgba(220, 38, 38, 0.08)",
+        "info": "#525252"
+      },
+      "border": {
+        "default": "#e0e0e0",
+        "strong": "#c7c7c7"
+      },
+      "graph": {
+        "closed": "#34d399",
+        "open": "#d4940a",
+        "active": "#00b377",
+        "link": "rgba(0, 0, 0, 0.08)"
+      }
+    }
+  },
+  "logo": {
+    "type": "node-graph-constellation",
+    "description": "Four connected nodes forming an abstract network graph. Two nodes use the accent color, two use the foreground color.",
+    "nodes": [
+      {"cx": 5, "cy": 5, "r": 2.5, "fill": "accent"},
+      {"cx": 17, "cy": 8, "r": 2.0, "fill": "foreground"},
+      {"cx": 8, "cy": 17, "r": 2.0, "fill": "foreground"},
+      {"cx": 14, "cy": 17, "r": 1.6, "fill": "accent", "opacity": 0.7}
+    ],
+    "edges": [
+      [0, 1],
+      [0, 2],
+      [1, 3],
+      [2, 3]
+    ],
+    "edgeStyle": {"strokeWidth": 1.2, "opacity": 0.35, "stroke": "foreground"},
+    "viewBox": "0 0 22 22"
+  },
+  "files": {
+    "favicon": "assets/favicon.svg",
+    "logoMarkDark": "assets/logo-mark-dark.svg",
+    "logoMarkLight": "assets/logo-mark-light.svg",
+    "logoFullDark": "assets/logo-full-dark.svg",
+    "logoFullLight": "assets/logo-full-light.svg"
+  },
+  "meta": {
+    "themeColorDark": "#0a0a0a",
+    "themeColorLight": "#fafafa"
+  }
+}
