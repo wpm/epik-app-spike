@@ -32,6 +32,7 @@ pub fn run() {
             commands::session_running,
             commands::session_policy,
             commands::session_stderr,
+            commands::profile_shortfalls,
         ])
         .build(tauri::generate_context!())
         .expect("failed to build the Epik application");

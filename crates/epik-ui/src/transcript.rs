@@ -168,6 +168,19 @@ impl Transcript {
             .collect()
     }
 
+    /// The engine is spawned and its stdin is open, so a turn can be sent.
+    ///
+    /// Not derived from `Init`, because the CLI emits `system/init` when the first
+    /// *turn* begins rather than at handshake time. Waiting for it would leave the
+    /// input box disabled with no way to ever enable it — the session would be
+    /// live and unusable. Verified against the real CLI, which is the only place
+    /// this shows: a stub that emits `init` up front hides it completely.
+    pub fn mark_started(&mut self) {
+        if self.status == Status::Starting {
+            self.status = Status::Idle;
+        }
+    }
+
     /// Record a turn the user just sent. Not derived from an event: the CLI does
     /// not echo user turns back, so the only record of one is the act of sending.
     pub fn push_user(&mut self, text: String) {
@@ -727,6 +740,49 @@ mod tests {
         assert_eq!(t.cli_version, "2.1.220");
         assert_eq!(t.session_id, "abc123");
         assert_eq!(t.tools, vec!["Bash".to_owned()]);
+    }
+
+    /// The real CLI emits `init` when the first turn begins, not at handshake
+    /// time. If the input box waited for `init`, the first turn could never be
+    /// sent and the session would be live and unusable.
+    #[test]
+    fn a_started_session_accepts_input_before_init_arrives() {
+        let mut t = Transcript {
+            status: Status::Starting,
+            ..Transcript::default()
+        };
+        assert!(!t.status.is_live(), "starting is not yet sendable");
+
+        t.mark_started();
+        assert_eq!(t.status, Status::Idle);
+        assert!(t.status.is_live(), "a started session must accept a turn");
+
+        // And `init`, whenever it turns up, fills in the facts without disturbing
+        // a turn that is already in flight.
+        t.push_user("hello".into());
+        assert_eq!(t.status, Status::Streaming);
+        t.apply(SessionEvent::Init {
+            session_id: "s".into(),
+            model: "claude-sonnet-5".into(),
+            cli_version: "2.1.220".into(),
+            tools: vec![],
+        });
+        assert_eq!(
+            t.status,
+            Status::Streaming,
+            "init must not interrupt a turn already running"
+        );
+        assert_eq!(t.model, "claude-sonnet-5");
+    }
+
+    #[test]
+    fn mark_started_does_not_revive_a_closed_session() {
+        let mut t = Transcript {
+            status: Status::Closed,
+            ..Transcript::default()
+        };
+        t.mark_started();
+        assert_eq!(t.status, Status::Closed);
     }
 
     #[test]

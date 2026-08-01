@@ -119,6 +119,23 @@ impl SessionClient {
                     // arrives on it as the `Init` event.
                     CHANNEL.with(|slot| *slot.borrow_mut() = Some(channel));
                     self.profile.set(Some(profile));
+                    // Sendable now. The CLI's `init` does not arrive until the
+                    // first turn, so waiting for it would disable the input box
+                    // with no way to ever enable it.
+                    self.transcript.update(|t| t.mark_started());
+                    // A profile that could not find what it needs is running in a
+                    // reduced form. Saying so beats letting the user work out why
+                    // a tool they expected is not there.
+                    if let Ok(shortfalls) = ipc::call_with::<Vec<String>>(
+                        "profile_shortfalls",
+                        &StartArgs { profile },
+                    )
+                    .await
+                    {
+                        for shortfall in shortfalls {
+                            self.note(shortfall, Level::Warning);
+                        }
+                    }
                 }
                 Err(err) => {
                     self.fail("starting the session", err);
