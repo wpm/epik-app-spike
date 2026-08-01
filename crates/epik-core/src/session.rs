@@ -138,6 +138,9 @@ impl Session {
         };
 
         let (tx, rx) = mpsc::channel(256);
+        // Kept back from the reader task so `spawn` itself can report a problem
+        // on the same channel everything else arrives on.
+        let notices = tx.clone();
         let stderr_pump = tokio::spawn(stderr_task(stderr, tx.clone(), handle.clone()));
         tokio::spawn(reader_task(
             child,
@@ -149,9 +152,24 @@ impl Session {
         ));
 
         // Open the control channel; the ack arrives as a ControlAck event.
-        handle
+        //
+        // A failure here is not a spawn failure. An engine that dies before this
+        // write lands — a bad config, a missing dependency — makes it fail with
+        // "broken pipe", and returning that would replace the actual explanation
+        // with plumbing detail. The child has already been spawned and its output
+        // is already being read, so the reason is on its way as `Stderr` lines
+        // followed by `Closed`; the session is handed over so the host can see
+        // them. This is precisely the case stderr capture exists for.
+        if let Err(err) = handle
             .send_control(serde_json::json!({"subtype": "initialize"}))
-            .await?;
+            .await
+        {
+            let _ = notices
+                .send(SessionEvent::Unknown(format!(
+                    "could not open the control channel: {err}"
+                )))
+                .await;
+        }
 
         Ok(Self { events: rx, handle })
     }

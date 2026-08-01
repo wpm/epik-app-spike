@@ -40,6 +40,8 @@ pub use doctor::{inspect, inspect_with, run_doctor};
 pub use event::{SessionConfig, SessionEvent};
 pub use permission::{PermissionAction, PermissionPolicy, PermissionRule, ToolMatcher};
 pub use profile::Profile;
+#[cfg(feature = "host")]
+pub use profile::{EPIK_READ_ONLY_TOOLS, EpikLayout, READ_ONLY_BUILTINS};
 pub use protocol::{
     ApiMessage, AssistantEnvelope, CanUseToolRequest, ContentBlock, ControlRequest,
     ControlRequestEnvelope, ControlResponseEnvelope, ControlResponsePayload, PermissionDecision,

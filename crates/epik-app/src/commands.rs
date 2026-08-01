@@ -122,6 +122,17 @@ pub async fn session_policy(
     Ok(state.handle().await.map(|handle| handle.policy()))
 }
 
+/// What the active profile could not find — a missing Epik checkout means no
+/// persona and no EpikMCP, which changes what the session can do, so it is
+/// reported rather than left for the user to infer from tools that are absent.
+#[tauri::command]
+pub async fn profile_shortfalls(profile: Profile) -> Result<Vec<String>, String> {
+    Ok(match profile {
+        Profile::Epik => epik_core::EpikLayout::discover().shortfalls(),
+        Profile::Plain => Vec::new(),
+    })
+}
+
 /// The engine's recent stderr. What a post-mortem asks for after a session
 /// closes with a nonzero exit code.
 #[tauri::command]

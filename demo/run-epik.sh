@@ -1,27 +1,25 @@
 #!/bin/sh
-# M3 demo: launch epik-app with the Epik persona and EpikMCP attached.
+# The Epik demo, 0.2.0: everything the M3 shell script assembled by hand is now
+# the built-in Epik profile, so this only has to say where the Epik checkout is.
 #
-# Paths point at Bill's local checkout of epik-agent/Epik; the packaged app
-# would resolve these itself (see FINDINGS.md, distribution).
-#
-# Read-only EpikMCP tools are pre-allowed so monitoring doesn't nag; mutating
-# tools (issue_create, feature_launch, ...) still raise permission asks in
-# the app, which is the point of the demo.
+# What the profile does — persona, EpikMCP, settings isolation, read-only tools
+# pre-allowed and mutating ones gated — is in README.md and in
+# crates/epik-core/src/profile.rs. The old flags are gone because they were
+# describing a policy that now lives in Rust, where it can be tested.
 
-EPIK_CHECKOUT=${EPIK_CHECKOUT:-/Users/mcneill/Projects/Epik/Epik}
+set -e
 DIR=$(dirname "$0")
+REPO=$(cd "$DIR/.." && pwd)
 
-exec "$DIR/../target/debug/epik-app" \
-  --model claude-sonnet-5 \
-  --mcp-config "$DIR/epik-mcp.json" \
-  --persona-file "$EPIK_CHECKOUT/plugin/skills/summon/persona.md" \
-  --greet "Please introduce yourself." \
-  --permission-mode default \
-  --settings '{"permissions":{"allow":[
-      "mcp__EpikMCP__issue_list","mcp__EpikMCP__issue_get",
-      "mcp__EpikMCP__run_list","mcp__EpikMCP__run_get","mcp__EpikMCP__run_logs",
-      "mcp__EpikMCP__feature_status","mcp__EpikMCP__repo_get",
-      "mcp__EpikMCP__repo_default_branch",
-      "mcp__EpikMCP__pr_list","mcp__EpikMCP__pr_get",
-      "mcp__EpikMCP__issue_list_relationships","mcp__EpikMCP__project_list_items"
-  ]}}'
+: "${EPIK_CHECKOUT:=$HOME/Projects/Epik/Epik}"
+export EPIK_CHECKOUT
+
+if [ ! -d "$EPIK_CHECKOUT" ]; then
+  echo "No Epik checkout at $EPIK_CHECKOUT." >&2
+  echo "Set EPIK_CHECKOUT to one. The app still runs without it, but with no" >&2
+  echo "persona and no EpikMCP — and it will say so in the window." >&2
+fi
+
+# Tauri embeds the frontend at compile time, so it has to exist first.
+trunk build --config "$REPO/crates/epik-ui/Trunk.toml"
+exec cargo run --manifest-path "$REPO/Cargo.toml" -p epik-app
