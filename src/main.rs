@@ -1,15 +1,13 @@
 //! M0 — Handshake: spawn `claude -p` one-shot, parse the stream-json output,
 //! print the assistant text and run stats.
 
-mod protocol;
-
 use std::process::Stdio;
 
 use anyhow::{Context, bail};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
-use protocol::{ContentBlock, StreamMessage};
+use epik_app::protocol::{ContentBlock, StreamMessage};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -71,6 +69,10 @@ async fn main() -> anyhow::Result<()> {
             StreamMessage::Unknown(v) => {
                 eprintln!("[unknown message] {v}");
             }
+            // Control traffic doesn't occur in one-shot stdin-less runs.
+            StreamMessage::ControlRequest(_)
+            | StreamMessage::ControlResponse(_)
+            | StreamMessage::ControlCancelRequest { .. } => {}
         }
     }
 
