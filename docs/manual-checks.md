@@ -60,6 +60,7 @@ Do not repeat these by hand:
 | A wedged engine is killed rather than orphaned | `session::tests::end_session_kills_an_engine_that_ignores_stdin_closing` |
 | Quitting twice does not stall | `session::tests::end_session_is_idempotent` |
 | Link and image destinations are scheme-filtered | `epik-ui` `markdown::tests`, the `*_is_not_a_link` family |
+| Ending a session lets its event stream finish | `epik-app` `ipc_stream::ending_a_session_lets_the_event_stream_finish` |
 
 ## Linux equivalent, for CI-adjacent checking
 

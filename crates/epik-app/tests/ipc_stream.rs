@@ -16,11 +16,15 @@
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use epik_app::pump::{DELTA_FLUSH, EventSink, pump};
-use epik_core::{PermissionPolicy, PermissionRule, Session, SessionConfig, SessionEvent};
+use epik_app::state::AppState;
+use epik_core::{
+    EngineSearch, PermissionPolicy, PermissionRule, Session, SessionConfig, SessionEvent,
+};
 
 #[derive(Clone, Default)]
 struct Recorder(Arc<Mutex<Vec<SessionEvent>>>);
@@ -267,4 +271,110 @@ async fn a_long_stream_flushes_progressively() {
         DELTA_FLUSH < Duration::from_millis(80),
         "this test assumes the stub's pauses exceed the flush window"
     );
+}
+
+/// A user-initiated end must let the event stream finish.
+///
+/// This one goes through `AppState` rather than calling `pump` directly,
+/// because the property is about what `AppState::end` does *around* the pump.
+/// The engine's last words and the `Closed` event both cross the channel after
+/// `end_session` has returned — `end_session` resolves on the reap, and the
+/// reader task sends `Closed` after it — so ending a session by aborting the
+/// pump races the frontend for them. Lose that race and the transcript is
+/// missing the tail of the assistant's last message and the status bar sits on
+/// "running" for a session that is over.
+///
+/// The task started here is the real pump followed by a marker. The pause in
+/// front of the marker is what makes the property testable rather than a
+/// coin-toss: the real pump's outstanding work at that moment is a flush
+/// window's worth of buffered text and one more event behind it, which is
+/// microseconds an abort sometimes loses and sometimes does not. Lengthening it
+/// asks the question the fix answers — is the draining task *allowed to
+/// finish*, or is it cut off? — and gets the same answer every run.
+#[tokio::test]
+async fn ending_a_session_lets_the_event_stream_finish() {
+    // Emits its last text after stdin closes and then exits, which is what a
+    // CLI finishing its turn on the way out does.
+    let engine = stub_engine(
+        "end-drain",
+        &format!("read -r _init\ncat > /dev/null\n{}\n", delta_line("tail")),
+    );
+
+    // An engine report with no path, so `AppState::start` leaves the stub in
+    // place instead of substituting the `claude` on this machine.
+    let nothing_found = epik_core::inspect_with(&EngineSearch {
+        path_env: None,
+        known_dirs: Vec::new(),
+        binary: "claude".to_owned(),
+    });
+    let state = AppState::with_engine(nothing_found);
+
+    let sink = Recorder::default();
+    let recorder = sink.clone();
+    let finished = Arc::new(AtomicBool::new(false));
+    let marker = finished.clone();
+    state
+        .start(config(engine), move |events| async move {
+            pump(events, recorder).await;
+            tokio::time::sleep(Duration::from_millis(250)).await;
+            marker.store(true, Ordering::SeqCst);
+        })
+        .await
+        .expect("start the stub session");
+
+    // Let the stub consume the initialize request, then end the session the way
+    // the frontend's "end session" button does.
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    tokio::time::timeout(Duration::from_secs(20), state.end())
+        .await
+        .expect("ending the session did not finish in time");
+
+    assert!(
+        finished.load(Ordering::SeqCst),
+        "the draining task was cut off instead of being allowed to finish"
+    );
+
+    let events = sink.events();
+    assert!(
+        events.contains(&SessionEvent::TextDelta("tail".to_owned())),
+        "buffered text was discarded by the end: {events:#?}"
+    );
+    assert!(
+        matches!(events.last(), Some(SessionEvent::Closed { .. })),
+        "the frontend was never told the session closed: {events:#?}"
+    );
+    assert!(!state.is_running().await, "the session is still recorded");
+}
+
+/// The other half of the drain: a task that will not finish must not be able to
+/// hold up the app's exit. `PUMP_DRAIN_GRACE` is two seconds, and this pump
+/// never returns, so `end` has to give up on it and come back anyway.
+#[tokio::test]
+async fn a_pump_that_never_finishes_does_not_wedge_the_end() {
+    let engine = stub_engine("end-wedged-pump", "read -r _init\ncat > /dev/null\n");
+    let nothing_found = epik_core::inspect_with(&EngineSearch {
+        path_env: None,
+        known_dirs: Vec::new(),
+        binary: "claude".to_owned(),
+    });
+    let state = AppState::with_engine(nothing_found);
+
+    state
+        .start(config(engine), |_events| async {
+            std::future::pending::<()>().await;
+        })
+        .await
+        .expect("start the stub session");
+
+    let started = std::time::Instant::now();
+    tokio::time::timeout(Duration::from_secs(20), state.end())
+        .await
+        .expect("a pump that never finishes wedged the end");
+    let elapsed = started.elapsed();
+
+    assert!(
+        elapsed < Duration::from_secs(10),
+        "waited far longer than the drain grace ({elapsed:?})"
+    );
+    assert!(!state.is_running().await, "the session is still recorded");
 }
