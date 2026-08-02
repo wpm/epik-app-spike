@@ -46,6 +46,42 @@ is somewhere new. Add the directory to `doctor::known_dirs`.
   the app's exit handler calls it.
 - Close the window with ⌘W and check `pgrep -fl claude` again.
 
+## The interface renders under the content security policy
+
+**Why this is manual.** `app.security.csp` in `crates/epik-app/tauri.conf.json`
+is enforced by the WebView, not by anything `cargo test` can reach. The policy
+is explained directive by directive in `epik-app`'s crate documentation; what
+cannot be asserted is that the frontend actually runs under it. The two ways it
+could fail are both invisible to the test suite:
+
+- Trunk's wasm loader is an inline `<script type="module">`. It is allowed by
+  the sha256 hash `tauri-codegen` computes for it at build time, so a change to
+  how the frontend is bundled — a different loader, a second inline script
+  injected by a tool — can silently produce a blank window.
+- `script-src` carries `'wasm-unsafe-eval'` rather than `'unsafe-eval'`. WebKit
+  is the engine on macOS and Linux; if it ever declines to instantiate the
+  module under that source expression, the window comes up empty.
+
+**Steps.** Both builds, because the embedded-asset path differs:
+
+1. `cargo tauri dev` in `crates/epik-app` (or the Xvfb recipe below against
+   `cargo run -p epik-app`, which is how this was last checked).
+2. `cargo tauri build`, then launch the bundle.
+
+**Expect** the full interface in both: chat pane, composer, right-hand session
+panel, status bar, and the brand styling — and, after a turn, streamed markdown
+with lists and code blocks, and a permission card with working buttons. A blank
+or unstyled window is the failure. Open the WebView inspector (right-click →
+Inspect on a debug build) and read the console: a CSP failure names the
+directive it violated, which says immediately whether it is the loader's hash or
+a directive that is too tight.
+
+**Also worth checking, since it is the point of the policy.** Ask the engine to
+emit `![](https://example.com/pixel.png)` and confirm the image does not load —
+`img-src` deliberately excludes `https:`, because a remote image in model output
+is a request to a host the model chose. The markdown renderer emits the `<img>`;
+the CSP is what stops it fetching.
+
 ## What the automated tests already cover
 
 Do not repeat these by hand:
