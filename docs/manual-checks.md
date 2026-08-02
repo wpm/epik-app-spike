@@ -59,6 +59,7 @@ Do not repeat these by hand:
 | A clean quit reaps the engine | `session::tests::end_session_reaps_an_engine_that_exits_on_its_own` |
 | A wedged engine is killed rather than orphaned | `session::tests::end_session_kills_an_engine_that_ignores_stdin_closing` |
 | Quitting twice does not stall | `session::tests::end_session_is_idempotent` |
+| Link and image destinations are scheme-filtered | `epik-ui` `markdown::tests`, the `*_is_not_a_link` family |
 
 ## Linux equivalent, for CI-adjacent checking
 
