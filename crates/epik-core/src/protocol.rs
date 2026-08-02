@@ -126,7 +126,11 @@ pub enum ControlRequest {
 /// Permission ask for one tool call. The CLI sends more advisory fields than
 /// listed here (suggestions, rule matches); we keep what a UI needs to render
 /// a prompt and answer it.
-#[derive(Debug, Clone, Deserialize)]
+///
+/// `Serialize` as well as `Deserialize`, because this is the one wire type that
+/// rides inside a [`crate::SessionEvent`] and therefore has to cross the host's
+/// IPC boundary intact.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CanUseToolRequest {
     pub tool_name: String,
     #[serde(default)]
@@ -185,12 +189,20 @@ pub fn control_request(request_id: &str, request: Value) -> Value {
 }
 
 /// Answer to a `can_use_tool` ask.
-#[derive(Debug, Clone, Serialize)]
+///
+/// `Deserialize` as well as `Serialize`: the decision originates in the UI, so it
+/// crosses the host's IPC boundary inbound before being serialized outbound to
+/// the CLI. The shape on both wires is the same one, which is the point.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "behavior", rename_all = "camelCase")]
 pub enum PermissionDecision {
     #[serde(rename = "allow")]
     Allow {
-        #[serde(rename = "updatedInput", skip_serializing_if = "Option::is_none")]
+        #[serde(
+            rename = "updatedInput",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
         updated_input: Option<Value>,
     },
     #[serde(rename = "deny")]

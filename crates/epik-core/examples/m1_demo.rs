@@ -7,8 +7,9 @@
 //!
 //! Run: cargo run --example m1_demo
 
-use epik_app::protocol::PermissionDecision;
-use epik_app::session::{Session, SessionConfig, SessionEvent, SessionPermissionMode};
+use epik_core::permission::PermissionPolicy;
+use epik_core::protocol::PermissionDecision;
+use epik_core::session::{Session, SessionConfig, SessionEvent};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -17,7 +18,8 @@ async fn main() -> anyhow::Result<()> {
         permission_mode: Some("default".to_owned()),
         settings_json: Some(r#"{"permissions":{"ask":["Bash"]}}"#.to_owned()),
         tools: Some("Bash".to_owned()),
-        permission_handling: SessionPermissionMode::Ask,
+        // The empty policy: every ask reaches this example so it can decide.
+        permission_policy: PermissionPolicy::ask(),
         extra_args: vec!["--no-session-persistence".to_owned()],
         ..SessionConfig::default()
     };
@@ -116,8 +118,12 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
             SessionEvent::Unknown(info) => println!("[unknown] {info}"),
-            SessionEvent::Closed { status } => {
-                println!("[closed] status={status:?}");
+            SessionEvent::PermissionResolved {
+                tool_name, action, ..
+            } => println!("[permission] {tool_name} resolved by policy: {action:?}"),
+            SessionEvent::Stderr(line) => println!("[stderr] {line}"),
+            SessionEvent::Closed { exit_code } => {
+                println!("[closed] exit_code={exit_code:?}");
                 break;
             }
         }

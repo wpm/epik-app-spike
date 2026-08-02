@@ -1,0 +1,14 @@
+# Trunk builds the wasm frontend straight into the Tauri app's `frontendDist`,
+# so there is one dist directory and `cargo build -p epik-app` picks up whatever
+# was last built rather than a copy that can go stale.
+[build]
+target = "index.html"
+dist = "../epik-app/dist"
+
+[tools]
+# Pinned rather than floating: an unpinned CSS toolchain is a build that breaks
+# on someone else's machine for reasons unrelated to the change they made.
+tailwindcss = "3.4.17"
+
+[watch]
+watch = ["src", "styles", "index.html", "../epik-core/src"]

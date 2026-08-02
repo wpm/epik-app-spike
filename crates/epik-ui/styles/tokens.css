@@ -1,0 +1,78 @@
+/* Design tokens vendored from Epik's brand.json.
+ *
+ * GENERATED — do not edit. Regenerate with:
+ *   python3 crates/epik-ui/brand/generate-tokens.py
+ * after updating brand/brand.json from epik-agent/Epik website/brand/brand.json.
+ *
+ * Emitted as CSS custom properties rather than baked into Tailwind's config so
+ * the two themes are one stylesheet and a theme switch is a class on <html>,
+ * not a rebuild.
+ */
+
+:root, :root[data-theme="dark"] {
+  --epik-bg-root: #0a0a0a;
+  --epik-bg-surface: #111111;
+  --epik-bg-raised: #1a1a1a;
+  --epik-bg-input: #141414;
+  --epik-bg-bar: #0e0e0e;
+  --epik-bg-hover: #1f1f1f;
+  --epik-bg-active: #262626;
+  --epik-bg-overlay: rgba(0, 0, 0, 0.60);
+  --epik-text-primary: #ededed;
+  --epik-text-secondary: #a0a0a0;
+  --epik-text-muted: #666666;
+  --epik-text-faint: #404040;
+  --epik-text-inverse: #0a0a0a;
+  --epik-accent-base: #00e599;
+  --epik-accent-hover: #33edb3;
+  --epik-accent-muted: rgba(0, 229, 153, 0.12);
+  --epik-accent-on-accent: #0a0a0a;
+  --epik-semantic-success: #00e599;
+  --epik-semantic-success-muted: rgba(0, 229, 153, 0.12);
+  --epik-semantic-warning: #f5a623;
+  --epik-semantic-warning-muted: rgba(245, 166, 35, 0.12);
+  --epik-semantic-error: #ef4444;
+  --epik-semantic-error-muted: rgba(239, 68, 68, 0.12);
+  --epik-semantic-info: #a0a0a0;
+  --epik-border-default: #1f1f1f;
+  --epik-border-strong: #333333;
+  --epik-graph-closed: #34d399;
+  --epik-graph-open: #f5a623;
+  --epik-graph-active: #00e599;
+  --epik-graph-link: rgba(255, 255, 255, 0.10);
+  --epik-font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --epik-font-mono: 'Geist Mono', ui-monospace, monospace;
+}
+
+:root[data-theme="light"] {
+  --epik-bg-root: #fafafa;
+  --epik-bg-surface: #f0f0f0;
+  --epik-bg-raised: #e5e5e5;
+  --epik-bg-input: #ffffff;
+  --epik-bg-bar: #f0f0f0;
+  --epik-bg-hover: #e0e0e0;
+  --epik-bg-active: #d4d4d4;
+  --epik-bg-overlay: rgba(0, 0, 0, 0.15);
+  --epik-text-primary: #0a0a0a;
+  --epik-text-secondary: #525252;
+  --epik-text-muted: #737373;
+  --epik-text-faint: #a3a3a3;
+  --epik-text-inverse: #ededed;
+  --epik-accent-base: #00b377;
+  --epik-accent-hover: #009966;
+  --epik-accent-muted: rgba(0, 179, 119, 0.10);
+  --epik-accent-on-accent: #ffffff;
+  --epik-semantic-success: #00b377;
+  --epik-semantic-success-muted: rgba(0, 179, 119, 0.10);
+  --epik-semantic-warning: #d4940a;
+  --epik-semantic-warning-muted: rgba(212, 148, 10, 0.10);
+  --epik-semantic-error: #dc2626;
+  --epik-semantic-error-muted: rgba(220, 38, 38, 0.08);
+  --epik-semantic-info: #525252;
+  --epik-border-default: #e0e0e0;
+  --epik-border-strong: #c7c7c7;
+  --epik-graph-closed: #34d399;
+  --epik-graph-open: #d4940a;
+  --epik-graph-active: #00b377;
+  --epik-graph-link: rgba(0, 0, 0, 0.08);
+}

@@ -8,7 +8,7 @@ the goal resolves. This loop is your operating rhythm; LOG.md is your memory.
 1. Read `LOG.md` in full. It is the authoritative state. Trust it over your memory
    of this conversation.
 2. Read the goal prompt's milestones and kill criteria (it lives on disk at
-   `.claude/commands/goal.md`).
+   `.claude/commands/spike-goal.md`).
 3. State (to the log, not to Bill) the current milestone, the next smallest step,
    and any live risk. Then work.
 
