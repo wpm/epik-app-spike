@@ -1,0 +1,102 @@
+# Provisioning for any job that compiles this workspace: the Tauri system
+# libraries, the Rust toolchain, the cargo cache, and Trunk. `ci.yml` and
+# `epik-build.yml` both use this action, so the two jobs are provisioned
+# identically and share one cargo cache — CI populates it on pushes to the
+# default branch, and build runs restore it — and neither file can drift
+# from the other.
+
+name: Provision Rust and Tauri toolchain
+description: >
+  Install the Tauri system libraries, the Rust toolchain (stable with rustfmt,
+  clippy, and the wasm32 target), restore the shared cargo cache, and install
+  Trunk.
+
+inputs:
+  save-cache:
+    description: >
+      Whether this job also saves the cargo cache when its key is new. CI keeps
+      the default and is the cache's one writer; the build job passes "false"
+      and is restore-only, so a two-hour agent session that grows target/
+      across many branches can never publish that snapshot under the clean
+      key CI would otherwise write.
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    # Tauri 2 links against the system WebKit stack; librsvg and the
+    # appindicator library are needed by the bundler and tray respectively.
+    # Installed before the Rust steps because `tauri-build` probes for them
+    # via pkg-config at compile time, not at bundle time.
+    - name: Install Tauri system dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends -y \
+          libwebkit2gtk-4.1-dev \
+          libjavascriptcoregtk-4.1-dev \
+          libsoup-3.0-dev \
+          libgtk-3-dev \
+          libayatana-appindicator3-dev \
+          librsvg2-dev \
+          libxdo-dev \
+          libssl-dev \
+          file \
+          patchelf
+
+    - name: Install Rust toolchain
+      shell: bash
+      run: |
+        rustup toolchain install stable --profile minimal \
+          --component rustfmt --component clippy
+        rustup default stable
+        rustup target add wasm32-unknown-unknown
+        rustc --version && cargo --version
+        cargo fmt --version && cargo clippy --version
+
+    - name: Cache cargo registry and target directory
+      if: ${{ inputs.save-cache == 'true' }}
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
+          ~/.cargo/bin
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Restore cargo registry and target directory
+      if: ${{ inputs.save-cache != 'true' }}
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
+          ~/.cargo/bin
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    # Prebuilt binary first; `cargo install` is the fallback so a missing or
+    # renamed release asset degrades to slow rather than broken.
+    - name: Install Trunk
+      shell: bash
+      run: |
+        if command -v trunk >/dev/null 2>&1; then
+          echo "trunk already present: $(trunk --version)"
+          exit 0
+        fi
+        url=https://github.com/trunk-rs/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz
+        if curl -fsSL --retry 3 "$url" -o /tmp/trunk.tar.gz; then
+          tar -xzf /tmp/trunk.tar.gz -C "$HOME/.cargo/bin" trunk
+          chmod +x "$HOME/.cargo/bin/trunk"
+        else
+          echo "prebuilt Trunk unavailable — building from source"
+          cargo install --locked trunk
+        fi
+        trunk --version

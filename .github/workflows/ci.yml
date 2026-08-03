@@ -1,26 +1,11 @@
 # Rust checks for every pull request.
 #
-# ---------------------------------------------------------------------------
-# NOT YET ACTIVE. This file is parked outside `.github/workflows/` because the
-# headless build that wrote it could not create it in place: GitHub refuses to
-# let any Actions token add or edit a file under `.github/workflows/`, and
-# `GITHUB_TOKEN` cannot be granted the `workflows` permission that would allow
-# it — the `permissions:` key has no such setting. Only a personal access token
-# with "Workflows: write" can commit a workflow file.
-#
-# To activate it, one command and a push from a human (or from a build whose
-# `EPIK_BUILD_GH_TOKEN` has Workflows: write):
-#
-#     git mv .github/workflows-pending/ci.yml .github/workflows/ci.yml
-#
-# The contents below are final and were verified by running each check locally
-# on the tree this landed on; nothing about the file needs editing.
-# ---------------------------------------------------------------------------
-#
 # One job on an ubuntu runner, provisioned for the whole 0.2.0 shape rather than
 # just the crates that exist today: Tauri's Linux system libraries, the
 # `wasm32-unknown-unknown` target, and Trunk are installed up front so the job
-# keeps working unchanged as the Tauri and Leptos crates arrive.
+# keeps working unchanged as the Tauri and Leptos crates arrive. Provisioning
+# lives in `.github/actions/provision`, shared with `epik-build.yml`, so the
+# two jobs are set up identically and share one cargo cache.
 #
 # `workflow_dispatch` is here for headless builds. A pull request opened with
 # `github.token` does not trigger `pull_request` runs — that is GitHub's
@@ -60,64 +45,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Tauri 2 links against the system WebKit stack; librsvg and the
-      # appindicator library are needed by the bundler and tray respectively.
-      # Installed before the Rust steps because `tauri-build` probes for them
-      # via pkg-config at compile time, not at bundle time.
-      - name: Install Tauri system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y \
-            libwebkit2gtk-4.1-dev \
-            libjavascriptcoregtk-4.1-dev \
-            libsoup-3.0-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libxdo-dev \
-            libssl-dev \
-            file \
-            patchelf
-
-      - name: Install Rust toolchain
-        run: |
-          rustup toolchain install stable --profile minimal \
-            --component rustfmt --component clippy
-          rustup default stable
-          rustup target add wasm32-unknown-unknown
-          rustc --version && cargo --version
-          cargo fmt --version && cargo clippy --version
-
-      - name: Cache cargo registry and target directory
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git/db
-            ~/.cargo/bin
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      # Prebuilt binary first; `cargo install` is the fallback so a missing or
-      # renamed release asset degrades to slow rather than broken.
-      - name: Install Trunk
-        run: |
-          if command -v trunk >/dev/null 2>&1; then
-            echo "trunk already present: $(trunk --version)"
-            exit 0
-          fi
-          url=https://github.com/trunk-rs/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz
-          if curl -fsSL --retry 3 "$url" -o /tmp/trunk.tar.gz; then
-            tar -xzf /tmp/trunk.tar.gz -C "$HOME/.cargo/bin" trunk
-            chmod +x "$HOME/.cargo/bin/trunk"
-          else
-            echo "prebuilt Trunk unavailable — building from source"
-            cargo install --locked trunk
-          fi
-          trunk --version
+      - name: Provision Rust and Tauri toolchain
+        uses: ./.github/actions/provision
 
       # The Leptos frontend is a wasm crate, so it is checked on its own target
       # rather than by the workspace-wide steps below. Both steps are guarded on

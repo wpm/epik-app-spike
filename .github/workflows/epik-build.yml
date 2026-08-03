@@ -73,6 +73,10 @@ jobs:
     env:
       BASE_BRANCH: ${{ inputs.base_branch || github.event.repository.default_branch }}
       TARGET_BRANCH: ${{ inputs.target_branch || format('feature-{0}', inputs.feature_issue_number) }}
+      # Matches ci.yml: cargo rebuilds anything compiled under different
+      # profile flags, so the builder's compiles reuse the shared cache only
+      # if this value is the same one CI populated it with.
+      CARGO_PROFILE_DEV_DEBUG: 0
     steps:
       - uses: actions/checkout@v4
         with:
@@ -145,6 +149,19 @@ jobs:
           gh issue comment "$FEATURE_ISSUE" -R "$GITHUB_REPOSITORY" \
             --body-file /tmp/preflight-comment.md
           exit 1
+
+      # After the preflight so a build that cannot run fails in seconds, and
+      # before the session so the builder lands on a runner where `cargo test`
+      # works immediately: no system packages to discover and install, and the
+      # cargo cache CI populated on the default branch already restored. Same
+      # action as ci.yml, so the two provisioned environments cannot drift.
+      - name: Provision Rust and Tauri toolchain
+        uses: ./.github/actions/provision
+        with:
+          # Restore-only: CI is the cache's one writer. An agent session that
+          # grows target/ for two hours must not publish that snapshot under
+          # the clean key CI would otherwise write.
+          save-cache: "false"
 
       - name: Run headless feature build
         uses: anthropics/claude-code-action@v1
