@@ -295,6 +295,27 @@ mod tests {
             drop(file);
             std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755))
                 .expect("chmod fake claude");
+
+            // Absorb the ETXTBSY race here, so `inspect_with` cannot lose to
+            // it later and misreport a fine engine as Unusable. Tests run
+            // concurrently in one process; if another test forks while this
+            // script is open for writing above, the forked child holds the
+            // write fd until its own exec completes, and exec of a file
+            // anyone holds open for writing fails with `Text file busy`. One
+            // successful run proves the writers are gone — after that the
+            // file has none and can never ETXTBSY again.
+            let mut delay = std::time::Duration::from_millis(10);
+            loop {
+                match Command::new(&bin).arg("--version").output() {
+                    Err(err) if err.kind() == std::io::ErrorKind::ExecutableFileBusy => {
+                        assert!(delay < std::time::Duration::from_secs(20), "{err}");
+                        std::thread::sleep(delay);
+                        delay *= 2;
+                    }
+                    _ => break,
+                }
+            }
+
             Self { dir }
         }
 

@@ -576,6 +576,37 @@ mod tests {
             }
         }
 
+        /// Spawn a session on a stub engine, absorbing the ETXTBSY race.
+        ///
+        /// Tests run concurrently in one process, and each stub spawn is a
+        /// fork+exec. If another test forks while this test's script is still
+        /// open for writing in `engine`, the forked child inherits that write
+        /// fd and holds it until its own exec completes — and exec of a file
+        /// anyone holds open for writing fails with `Text file busy`. The fd
+        /// is close-on-exec, so the window is microseconds wide; retrying is
+        /// the standard cure (cargo and rustbuild spawn the same way).
+        pub async fn spawn(config: SessionConfig) -> Session {
+            let mut delay = std::time::Duration::from_millis(10);
+            loop {
+                match Session::spawn(config.clone()).await {
+                    Ok(session) => return session,
+                    Err(err) if is_etxtbsy(&err) && delay < LIMIT => {
+                        tokio::time::sleep(delay).await;
+                        delay *= 2;
+                    }
+                    Err(err) => panic!("spawn stub engine: {err:?}"),
+                }
+            }
+        }
+
+        fn is_etxtbsy(err: &anyhow::Error) -> bool {
+            err.chain().any(|cause| {
+                cause
+                    .downcast_ref::<std::io::Error>()
+                    .is_some_and(|io| io.kind() == std::io::ErrorKind::ExecutableFileBusy)
+            })
+        }
+
         const LIMIT: std::time::Duration = std::time::Duration::from_secs(20);
 
         /// Collect events until the session closes, with a timeout so a broken
@@ -628,9 +659,7 @@ mod tests {
              echo 'engine: giving up' >&2\n\
              exit 3\n",
         );
-        let mut session = Session::spawn(stub::config(engine))
-            .await
-            .expect("spawn stub engine");
+        let mut session = stub::spawn(stub::config(engine)).await;
         let events = stub::drain(&mut session).await;
 
         let stderr_lines: Vec<&str> = events
@@ -672,9 +701,7 @@ mod tests {
                 "i=1\nwhile [ $i -le {overflow} ]; do echo \"line $i\" >&2; i=$((i+1)); done\n"
             ),
         );
-        let mut session = Session::spawn(stub::config(engine))
-            .await
-            .expect("spawn stub engine");
+        let mut session = stub::spawn(stub::config(engine)).await;
         stub::drain(&mut session).await;
 
         let retained = session.recent_stderr();
@@ -707,7 +734,7 @@ cat > /dev/null
             PermissionRule::allow_prefix("mcp__epik__"),
             PermissionRule::deny("Bash", "No shell in this session."),
         ]);
-        let mut session = Session::spawn(config).await.expect("spawn stub engine");
+        let mut session = stub::spawn(config).await;
 
         let mut resolved = Vec::new();
         let asked = stub::until(&mut session, "the uncovered ask", |event| match event {
@@ -752,9 +779,7 @@ echo '{"type":"control_request","request_id":"r2","request":{"subtype":"can_use_
 sleep 5
 "#,
         );
-        let mut session = Session::spawn(stub::config(engine))
-            .await
-            .expect("spawn stub engine");
+        let mut session = stub::spawn(stub::config(engine)).await;
         let handle = session.handle();
 
         // The first ask surfaces: the policy is empty.
@@ -812,9 +837,7 @@ sleep 5
     async fn end_session_reaps_an_engine_that_exits_on_its_own() {
         // Reads stdin until it closes, then exits — a well-behaved engine.
         let engine = stub::engine("quit-clean", "cat > /dev/null\nexit 0\n");
-        let session = Session::spawn(stub::config(engine))
-            .await
-            .expect("spawn stub engine");
+        let session = stub::spawn(stub::config(engine)).await;
         let handle = session.handle();
         let pid = handle.child_pid().expect("child has a pid");
 
@@ -836,9 +859,7 @@ sleep 5
         // Never reads stdin and outlives any grace period. Closing stdin will
         // not move it, so only a kill can.
         let engine = stub::engine("quit-wedged", "sleep 600\n");
-        let session = Session::spawn(stub::config(engine))
-            .await
-            .expect("spawn stub engine");
+        let session = stub::spawn(stub::config(engine)).await;
         let handle = session.handle();
         let pid = handle.child_pid().expect("child has a pid");
         #[cfg(target_os = "linux")]
@@ -869,9 +890,7 @@ sleep 5
     #[tokio::test]
     async fn end_session_is_idempotent() {
         let engine = stub::engine("quit-twice", "cat > /dev/null\n");
-        let session = Session::spawn(stub::config(engine))
-            .await
-            .expect("spawn stub engine");
+        let session = stub::spawn(stub::config(engine)).await;
         let handle = session.handle();
         handle.end_session().await;
         // A window close followed by an app quit hits this path twice; the
@@ -898,7 +917,7 @@ sleep 5
 "#;
         let mut config = stub::config(stub::engine("legacy-ask", SCRIPT));
         config.permission_policy = PermissionPolicy::ask();
-        let mut session = Session::spawn(config).await.expect("spawn");
+        let mut session = stub::spawn(config).await;
 
         let surfaced = stub::until(&mut session, "a verdict on Bash", |event| match event {
             SessionEvent::PermissionRequest { .. } => Some(true),
@@ -919,7 +938,7 @@ sleep 5
 "#;
         let mut config = stub::config(stub::engine("legacy-allow-all", SCRIPT));
         config.permission_policy = PermissionPolicy::allow_all();
-        let mut session = Session::spawn(config).await.expect("spawn");
+        let mut session = stub::spawn(config).await;
 
         let action = stub::until(&mut session, "a verdict on Bash", |event| match event {
             SessionEvent::PermissionResolved { action, .. } => Some(Some(action)),
