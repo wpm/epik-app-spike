@@ -11,6 +11,16 @@ description: >
   clippy, and the wasm32 target), restore the shared cargo cache, and install
   Trunk.
 
+inputs:
+  save-cache:
+    description: >
+      Whether this job also saves the cargo cache when its key is new. CI keeps
+      the default and is the cache's one writer; the build job passes "false"
+      and is restore-only, so a two-hour agent session that grows target/
+      across many branches can never publish that snapshot under the clean
+      key CI would otherwise write.
+    default: "true"
+
 runs:
   using: composite
   steps:
@@ -45,7 +55,22 @@ runs:
         cargo fmt --version && cargo clippy --version
 
     - name: Cache cargo registry and target directory
+      if: ${{ inputs.save-cache == 'true' }}
       uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
+          ~/.cargo/bin
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Restore cargo registry and target directory
+      if: ${{ inputs.save-cache != 'true' }}
+      uses: actions/cache/restore@v4
       with:
         path: |
           ~/.cargo/registry/index
